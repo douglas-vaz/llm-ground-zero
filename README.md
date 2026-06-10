@@ -14,7 +14,7 @@ Works with subscription plans — no pay-per-token API keys required anywhere.
 | Shared preferences & conventions | `agents/AGENTS.md`, loaded by every agent | plain markdown |
 | Project handoff between models | `context/<project>/handoff.md`, written at session end, read at session start | plain markdown + protocol in AGENTS.md |
 | Searchable cross-agent memory | MCP server all agents connect to; full-text search over decisions, gotchas, preferences | [Engram](https://github.com/Gentleman-Programming/engram) (Go binary, SQLite+FTS5, zero deps) |
-| Personal document index | ingest via `engram add` / HTTP API, recall via `mem_search` from any agent | Engram |
+| Personal document index | ingest via `engram save` / HTTP API, recall via `mem_search` from any agent | Engram |
 | Usage / token / cost tracking | parses each agent's local session logs | [ccusage](https://github.com/ryoppippi/ccusage), [tokscale](https://github.com/junhoyeo/tokscale) |
 
 ### How the two memory tiers work
@@ -55,7 +55,7 @@ documented here for troubleshooting or unsupported agents.
 ### Claude Code
 
 ```bash
-claude mcp add --scope user --env ENGRAM_DATA_DIR="$HOME/llm-ground-zero/data" engram -- engram mcp
+claude mcp add --scope user engram --env ENGRAM_DATA_DIR="$HOME/llm-ground-zero/data" -- engram mcp
 ```
 
 Shared instructions: `~/.claude/CLAUDE.md` gets the import line
@@ -117,7 +117,7 @@ tokscale         # visual dashboard
 **Add a document to the personal index:**
 
 ```bash
-engram add --type reference --title "..." --content "$(cat somefile.md)"
+engram save "Title of doc" "$(cat somefile.md)" --type reference
 engram search "query"          # or from any agent via the mem_search tool
 ```
 
