@@ -61,3 +61,22 @@ test("claudeToolCounts counts tool_use across sessions", () => {
   assert.strictEqual(counts.Bash, 3);
   assert.strictEqual(counts.Read, 1);
 });
+
+test("codexConversations reads meta and skips env context", () => {
+  const root = tmp();
+  writeJsonl(path.join(root, "2026", "06", "06", "rollout-x.jsonl"), [
+    { timestamp: "2026-06-06T10:59:13.989Z", type: "session_meta",
+      payload: { id: "abc", cwd: "/Users/x/officebrew",
+                 timestamp: "2026-06-06T10:59:13.866Z" } },
+    { type: "response_item", payload: { type: "message", role: "user",
+      content: [{ type: "input_text",
+                  text: "<environment_context>...</environment_context>" }] } },
+    { type: "response_item", payload: { type: "message", role: "user",
+      content: [{ type: "input_text", text: "Build the brew scheduler" }] } },
+  ]);
+  const convs = lib.codexConversations(root, 10);
+  assert.strictEqual(convs.length, 1);
+  assert.strictEqual(convs[0].agent, "codex");
+  assert.strictEqual(convs[0].project, "officebrew");
+  assert.strictEqual(convs[0].title, "Build the brew scheduler");
+});
