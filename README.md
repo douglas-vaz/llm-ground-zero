@@ -27,12 +27,17 @@ be useful to you too.
 
 **The app:**
 
-```
-brew install --cask --no-quarantine douglas-vaz/tap/llm-ground-zero
+```bash
+brew tap douglas-vaz/tap
+brew trust douglas-vaz/tap       # Homebrew 5+ requires trusting third-party taps
+brew install --cask llm-ground-zero
+xattr -dr com.apple.quarantine "/Applications/LLM Ground Zero.app"
 ```
 
-`--no-quarantine` because the app is unsigned — it's open source, read it
-before running it if that concerns you.
+The `xattr` line is needed because the app is unsigned and macOS Gatekeeper
+blocks it otherwise — it's open source, read it before running it if that
+concerns you. (On Homebrew 4.x you can use
+`brew install --cask --no-quarantine` instead.)
 
 No Homebrew? Grab the `.dmg` from [GitHub Releases](https://github.com/douglas-vaz/llm-ground-zero/releases).
 
