@@ -1,7 +1,7 @@
 {
   "name": "llm-ground-zero",
   "productName": "LLM Ground Zero",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Local dashboard for CLI coding agents — spend, tool usage, conversations, shared memory",
   "main": "main.js",
   "license": "MIT",

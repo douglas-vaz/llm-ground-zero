@@ -4,8 +4,8 @@
     {
       "name": "dashboard",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["app/server.js", "7788"],
-      "port": 7788
+      "runtimeArgs": ["app/server.js", "7790"],
+      "port": 7790
     }
   ]
 }

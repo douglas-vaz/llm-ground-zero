@@ -18,6 +18,11 @@
   h1 { font-size: 20px; font-weight: 600; }
   h1 span { color: var(--accent); }
   #status { color: var(--dim); font-size: 12px; }
+  #refresh { background: none; border: 1px solid var(--border); color: var(--dim);
+             border-radius: 6px; font: inherit; font-size: 13px; line-height: 1;
+             padding: 3px 8px; cursor: pointer; }
+  #refresh:hover { color: var(--text); border-color: var(--dim); }
+  #refresh:disabled { opacity: .5; cursor: wait; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
            gap: 12px; margin-bottom: 20px; }
   .card { background: var(--panel); border: 1px solid var(--border);
@@ -62,6 +67,7 @@
 <header>
   <h1>llm-<span>ground</span>-zero</h1>
   <div id="status">loading…</div>
+  <button id="refresh" title="bypass cache and reload all panels">↻</button>
 </header>
 
 <div class="cards" id="cards"></div>
@@ -102,11 +108,39 @@ function card(label, value, sub) {
           <div class="value">${value}</div><div class="sub">${sub||""}</div></div>`;
 }
 
-async function load() {
-  const [usage, tools, convs, mems] = await Promise.all(
-    ["usage","tools","conversations","memories"].map(p => fetch("/api/"+p).then(r => r.json())));
-  renderUsage(usage); renderTools(tools); renderConvs(convs); renderMems(mems);
-  $("status").textContent = "updated " + new Date().toLocaleTimeString();
+// Chart.js refuses to reuse a canvas; drop the old chart before re-rendering.
+function mkChart(id, cfg) {
+  const canvas = $(id);
+  Chart.getChart(canvas)?.destroy();
+  return new Chart(canvas, cfg);
+}
+
+async function load(fresh) {
+  const q = fresh ? "?fresh=1" : "";
+  $("status").textContent = fresh ? "refreshing…" : "loading…";
+  $("refresh").disabled = true;
+  try {
+    const [usage, blocks, tools, convs, mems] = await Promise.all(
+      ["usage","blocks","tools","conversations","memories"]
+        .map(p => fetch("/api/"+p+q).then(r => r.json())));
+    renderUsage(usage); renderBlock(blocks); renderTools(tools);
+    renderConvs(convs); renderMems(mems);
+    $("status").textContent = "updated " + new Date().toLocaleTimeString();
+  } finally {
+    $("refresh").disabled = false;
+  }
+}
+
+function renderBlock(b) {
+  const active = (b.blocks || []).find(x => x.isActive && !x.isGap);
+  let value = "—", sub = b.error || "no active block";
+  if (active) {
+    const mins = Math.max(0, Math.round((new Date(active.endTime) - Date.now()) / 60000));
+    value = fmt$(active.costUSD);
+    sub = `resets in ${Math.floor(mins/60)}h ${mins%60}m · ` +
+          fmt$(active.burnRate?.costPerHour || 0) + "/h burn";
+  }
+  $("cards").insertAdjacentHTML("beforeend", card("Current 5h block", value, sub));
 }
 
 function renderUsage(u) {
@@ -141,7 +175,7 @@ function renderUsage(u) {
   const byAgent = name => last30.map(d => (d.modelBreakdowns||[])
       .filter(m => name === "claude" ? m.modelName.startsWith("claude") : !m.modelName.startsWith("claude"))
       .reduce((s,m) => s + m.cost, 0));
-  new Chart($("dailyChart"), { type: "bar",
+  mkChart("dailyChart", { type: "bar",
     data: { labels: last30.map(d => d.period.slice(5)),
       datasets: [
         { label: "claude", data: byAgent("claude"), backgroundColor: PALETTE[1], stack: "s" },
@@ -150,7 +184,7 @@ function renderUsage(u) {
                plugins: { legend: { position: "bottom" } } } });
 
   const sorted = Object.entries(models).sort((a,b) => b[1]-a[1]).slice(0,7);
-  new Chart($("modelChart"), { type: "doughnut",
+  mkChart("modelChart", { type: "doughnut",
     data: { labels: sorted.map(e => e[0].replace("claude-","")),
             datasets: [{ data: sorted.map(e => e[1]), backgroundColor: PALETTE,
                          borderColor: "#161b22" }]},
@@ -162,7 +196,7 @@ function renderUsage(u) {
               m.modelName.startsWith("gpt") ? "Codex" : "Other";
     agentToks[a] = (agentToks[a]||0) + m.inputTokens + m.outputTokens +
                    (m.cacheCreationTokens||0) + (m.cacheReadTokens||0); }));
-  new Chart($("agentChart"), { type: "bar",
+  mkChart("agentChart", { type: "bar",
     data: { labels: Object.keys(agentToks),
             datasets: [{ data: Object.values(agentToks),
                          backgroundColor: [PALETTE[1], PALETTE[0], PALETTE[2]] }]},
@@ -173,7 +207,7 @@ function renderUsage(u) {
 function renderTools(t) {
   if (t.error) { $("toolErr").innerHTML = `<div class="err">${t.error}</div>`; return; }
   const entries = Object.entries(t.counts || {}).sort((a,b) => b[1]-a[1]).slice(0,12);
-  new Chart($("toolChart"), { type: "bar",
+  mkChart("toolChart", { type: "bar",
     data: { labels: entries.map(e => e[0].replace(/^mcp__/,"").slice(0,28)),
             datasets: [{ data: entries.map(e => e[1]), backgroundColor: PALETTE[3] }]},
     options: { indexAxis: "y", plugins: { legend: { display: false } } } });
@@ -200,8 +234,9 @@ function renderMems(mems) {
       <div class="body">${m.content}</div></li>`).join("");
 }
 
+$("refresh").addEventListener("click", () => load(true));
 load();
-setInterval(load, 120000);
+setInterval(() => load(), 120000);
 </script>
 </body>
 </html>

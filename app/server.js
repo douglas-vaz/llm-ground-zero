@@ -36,20 +36,20 @@ async function cached(key, fn) {
   return v;
 }
 
-function ccusageDaily() {
+function ccusageJson(component, args) {
   return new Promise((resolve) => {
-    execFile(process.execPath, [CCUSAGE_CLI, "daily", "--json"], {
+    execFile(process.execPath, [CCUSAGE_CLI, ...args, "--json"], {
       env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
       timeout: 120_000,
       maxBuffer: 64 * 1024 * 1024,
     }, (err, stdout, stderr) => {
       if (err) {
-        logError("usage", err, { version: VERSION });
+        logError(component, err, { version: VERSION });
         resolve({ error: "ccusage failed: " + sanitize(String(stderr)).slice(0, 300) });
       } else {
         try { resolve(JSON.parse(stdout)); }
         catch (e) {
-          logError("usage", e, { version: VERSION });
+          logError(component, e, { version: VERSION });
           resolve({ error: "ccusage output was not JSON" });
         }
       }
@@ -58,9 +58,11 @@ function ccusageDaily() {
 }
 
 function guard(component, fn) {
-  return async () => {
-    try { return await cached(component, fn); }
-    catch (e) {
+  return async (fresh) => {
+    try {
+      if (fresh) cache.delete(component);
+      return await cached(component, fn);
+    } catch (e) {
       logError(component, e, { version: VERSION });
       return { error: sanitize(e.message || String(e)).slice(0, 300) };
     }
@@ -68,7 +70,8 @@ function guard(component, fn) {
 }
 
 const ROUTES = {
-  "/api/usage": guard("usage", ccusageDaily),
+  "/api/usage": guard("usage", () => ccusageJson("usage", ["daily"])),
+  "/api/blocks": guard("blocks", () => ccusageJson("blocks", ["blocks"])),
   "/api/tools": guard("tools",
     async () => ({ days: 30, counts: lib.claudeToolCounts(CLAUDE_PROJECTS, 30) })),
   "/api/conversations": guard("conversations", async () => {
@@ -83,10 +86,11 @@ const ROUTES = {
 
 function startServer(port = 7788) {
   const server = http.createServer(async (req, res) => {
-    const url = (req.url || "/").split("?")[0];
+    const [url, query] = (req.url || "/").split("?");
     const route = ROUTES[url];
     if (route) {
-      const body = JSON.stringify(await route());
+      const fresh = new URLSearchParams(query).get("fresh") === "1";
+      const body = JSON.stringify(await route(fresh));
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(body);
     } else if (url === "/" || url === "/index.html") {
@@ -110,7 +114,7 @@ function startServer(port = 7788) {
   });
 }
 
-module.exports = { startServer };
+module.exports = { startServer, _cache: cache };
 
 if (require.main === module) {
   const port = Number(process.argv[2] || process.env.LLM_GROUND_ZERO_PORT || 7788);
