@@ -28,13 +28,13 @@ be useful to you too.
 **The app:**
 
 ```
-brew install --cask --no-quarantine douglasvaz/tap/llm-ground-zero
+brew install --cask --no-quarantine douglas-vaz/tap/llm-ground-zero
 ```
 
 `--no-quarantine` because the app is unsigned — it's open source, read it
 before running it if that concerns you.
 
-No Homebrew? Grab the `.dmg` from [GitHub Releases](https://github.com/douglasvaz/llm-ground-zero/releases).
+No Homebrew? Grab the `.dmg` from [GitHub Releases](https://github.com/douglas-vaz/llm-ground-zero/releases).
 
 No app needed? Run the browser-only dashboard instead:
 
@@ -45,7 +45,7 @@ cd app && npm run serve   # → http://localhost:7788
 **The agent wiring** (shared memory, AGENTS.md, usage tools):
 
 ```bash
-git clone https://github.com/douglasvaz/llm-ground-zero ~/llm-ground-zero
+git clone https://github.com/douglas-vaz/llm-ground-zero ~/llm-ground-zero
 cd ~/llm-ground-zero && ./setup.sh
 ```
 
