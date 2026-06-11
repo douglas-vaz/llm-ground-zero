@@ -1,2 +1,5 @@
 data/
 .DS_Store
+.idea/
+app/node_modules/
+app/dist/
