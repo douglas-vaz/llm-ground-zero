@@ -1,0 +1,35 @@
+{
+  "name": "llm-ground-zero",
+  "productName": "LLM Ground Zero",
+  "version": "0.1.0",
+  "description": "Local dashboard for CLI coding agents — spend, tool usage, conversations, shared memory",
+  "main": "main.js",
+  "license": "MIT",
+  "author": "Douglas Vas",
+  "scripts": {
+    "start": "electron .",
+    "serve": "node server.js",
+    "test": "node --test test/",
+    "dist": "electron-builder --mac --universal"
+  },
+  "dependencies": {
+    "ccusage": "^20.0.11"
+  },
+  "devDependencies": {
+    "electron": "^42.4.0",
+    "electron-builder": "^26.15.2"
+  },
+  "build": {
+    "appId": "com.douglasvas.llm-ground-zero",
+    "productName": "LLM Ground Zero",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "server.js", "lib.js", "log.js", "static/**"],
+    "asarUnpack": ["node_modules/ccusage/**"],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "identity": null,
+      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "artifactName": "llm-ground-zero-${version}-universal.dmg"
+    }
+  }
+}
