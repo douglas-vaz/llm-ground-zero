@@ -1,32 +1,49 @@
 # Handoff — llm-ground-zero
 
 ## Current state
-- Core setup shipped and verified: `setup.sh` (idempotent, sandbox-tested),
-  shared `agents/AGENTS.md`, Engram MCP registered with Claude Code + Codex,
-  ccusage/tokscale installed.
-- Web dashboard shipped: `./dashboard/serve.sh` → http://localhost:7788.
-  Stdlib Python server (`dashboard/server.py`) + tested parsers
-  (`dashboard/lib.py`, run `python3 dashboard/test_lib.py`). Panels: spend,
-  model/agent breakdowns, Claude Code tool usage, recent conversations
-  (Claude + Codex), Engram memory feed.
+- **Published**: public repo at https://github.com/douglas-vaz/llm-ground-zero
+  (MIT, copyright "Douglas Vas" — legal name, the missing z is intentional).
+- **macOS app shipped**: Electron app in `app/` (Node port of the old Python
+  dashboard; UI html unchanged). v0.1.0 released — tag push builds an
+  unsigned universal dmg via `.github/workflows/release.yml` and attaches
+  it + SHA256SUMS to the GitHub release.
+- **Homebrew tap live**: https://github.com/douglas-vaz/homebrew-tap
+  (`Casks/llm-ground-zero.rb`). Verified end-to-end:
+  `brew tap douglas-vaz/tap && brew trust douglas-vaz/tap &&
+  brew install --cask llm-ground-zero`, then
+  `xattr -dr com.apple.quarantine` (unsigned → Gatekeeper blocks).
+- Python `dashboard/` deleted; headless mode is `cd app && npm run serve`.
+  Tests: `cd app && npm test` (11 node:test tests).
+- Core agent wiring unchanged: `setup.sh`, `agents/AGENTS.md`, Engram MCP.
 
 ## Recent decisions
-- Engram over OpenMemory — user is subscription-only; OpenMemory needs an
-  OpenAI key (or Ollama). Engram is keyless, single binary.
-- Dashboard is read-only over local data; zero new deps (Chart.js via CDN).
-- Keyword search (FTS5) accepted for now; semantic upgrade path = OpenMemory
-  + Ollama (see specs in docs/superpowers/specs/).
+- Electron over menu-bar/Tauri; server ported to Node so the .app is
+  self-contained (ccusage is an npm dep, no Python).
+- Engram db read via macOS-bundled `/usr/bin/sqlite3 -json` — zero native
+  Node modules, keeps electron-builder trivial.
+- Unsigned builds (no Apple Developer account yet); revisit signing +
+  notarization + auto-update if the project gains traction.
+- Anonymous error log at `~/Library/Logs/llm-ground-zero/error.log`
+  (sanitize() collapses $HOME → `~`; only error name/message/stack logged).
 
 ## Gotchas
-- `claude mcp add`: server name must come BEFORE `--env`, command after `--`.
-- Engram v1.16.1 CLI is `engram save <title> <msg>` (GitHub docs say
-  `engram add` — stale).
-- Codex session logs wrap env context as user messages — skip texts starting
-  with `<` when extracting first prompts.
+- ccusage's cli.js delegates at runtime to per-arch native binaries
+  (`@ccusage/ccusage-darwin-{arm64,x64}`); npm only installs the host arch.
+  `predist` force-installs both + `asarUnpack` for `@ccusage/**` +
+  `x64ArchFiles: "**/ccusage"` make the universal dmg honest.
+- Spawning a bundled JS CLI from a packaged app: use `process.execPath` with
+  `ELECTRON_RUN_AS_NODE=1` and swap `app.asar` → `app.asar.unpacked`.
+- Homebrew 5: `--no-quarantine` flag removed; third-party taps need
+  `brew trust`. Docs/caveats updated accordingly.
+- GitHub handle is `douglas-vaz` (hyphen), not douglasvaz.
+- `node --test test/` fails on Node 22 — use bare `node --test`.
+- Older gotchas (claude mcp add arg order, engram save syntax, Codex env
+  noise rows) still apply; see git history of this file.
 
 ## Next steps
-1. User to fill "User preferences" section in agents/AGENTS.md.
-2. Optional: launchd/alias to keep dashboard handy; tokscale for heatmaps.
-3. Revisit semantic search if FTS5 recall proves insufficient.
+1. Optional: code signing + notarization ($99/yr) → removes xattr step.
+2. Graduate cask to homebrew/cask when notability criteria are met.
+3. User preferences section in agents/AGENTS.md still empty.
+4. Semantic search upgrade path unchanged (OpenMemory + Ollama specs).
 
-_Last updated: 2026-06-10 by Claude Code (Opus 4.8)_
+_Last updated: 2026-06-11 by Claude Code (Fable 5)_
