@@ -20,7 +20,7 @@
     "electron-builder": "^26.15.2"
   },
   "build": {
-    "appId": "com.douglasvas.llm-ground-zero",
+    "appId": "com.douglasvaz.llm-ground-zero",
     "productName": "LLM Ground Zero",
     "directories": { "output": "dist" },
     "files": ["main.js", "server.js", "lib.js", "log.js", "static/**"],
