@@ -43,7 +43,7 @@ install_usage_tools() {
 configure_claude() {
   if ! have claude; then SKIPPED+=("Claude Code — claude CLI not found"); return; fi
   claude mcp remove --scope user engram >/dev/null 2>&1 || true
-  claude mcp add --scope user --env ENGRAM_DATA_DIR="$DATA_DIR" engram -- engram mcp
+  claude mcp add --scope user engram --env ENGRAM_DATA_DIR="$DATA_DIR" -- engram mcp
   mkdir -p "$HOME/.claude"
   touch "$HOME/.claude/CLAUDE.md"
   append_once "$HOME/.claude/CLAUDE.md" "@$AGENTS_MD"
