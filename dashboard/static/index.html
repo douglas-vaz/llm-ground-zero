@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>llm-ground-zero</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #21262d;
+    --text: #e6edf3; --dim: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --orange: #d29922; --purple: #bc8cff; --red: #f85149;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text);
+         font: 14px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; padding: 24px; }
+  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; }
+  h1 { font-size: 20px; font-weight: 600; }
+  h1 span { color: var(--accent); }
+  #status { color: var(--dim); font-size: 12px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+           gap: 12px; margin-bottom: 20px; }
+  .card { background: var(--panel); border: 1px solid var(--border);
+          border-radius: 10px; padding: 14px 16px; }
+  .card .label { color: var(--dim); font-size: 11px; text-transform: uppercase;
+                 letter-spacing: .06em; }
+  .card .value { font-size: 24px; font-weight: 650; margin-top: 2px; }
+  .card .sub { color: var(--dim); font-size: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--border);
+           border-radius: 10px; padding: 16px; }
+  .panel h2 { font-size: 13px; color: var(--dim); text-transform: uppercase;
+              letter-spacing: .06em; margin-bottom: 12px; font-weight: 600; }
+  .span-8 { grid-column: span 8; } .span-4 { grid-column: span 4; }
+  .span-6 { grid-column: span 6; } .span-12 { grid-column: span 12; }
+  @media (max-width: 900px) { .span-8, .span-4, .span-6 { grid-column: span 12; } }
+  canvas { max-height: 260px; }
+  ul { list-style: none; }
+  .conv { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border);
+          align-items: baseline; }
+  .conv:last-child { border-bottom: none; }
+  .badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px;
+           text-transform: uppercase; flex-shrink: 0; }
+  .badge.claude { background: #2d1f0e; color: var(--orange); }
+  .badge.codex  { background: #0e2235; color: var(--accent); }
+  .conv .proj { color: var(--purple); font-size: 12px; flex-shrink: 0; }
+  .conv .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .conv .when { color: var(--dim); font-size: 12px; flex-shrink: 0; }
+  .mem { padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .mem:last-child { border-bottom: none; }
+  .mem .head { display: flex; gap: 8px; align-items: baseline; }
+  .mem .type { color: var(--green); font-size: 11px; font-weight: 700; }
+  .mem .title { font-weight: 600; }
+  .mem .body { color: var(--dim); font-size: 12px; margin-top: 2px;
+               display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+               overflow: hidden; }
+  .err { color: var(--red); font-size: 13px; }
+  .empty { color: var(--dim); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>llm-<span>ground</span>-zero</h1>
+  <div id="status">loading…</div>
+</header>
+
+<div class="cards" id="cards"></div>
+
+<div class="grid">
+  <div class="panel span-8"><h2>Daily spend — last 30 days (API-equivalent $)</h2>
+    <canvas id="dailyChart"></canvas><div id="dailyErr"></div></div>
+  <div class="panel span-4"><h2>Cost by model</h2>
+    <canvas id="modelChart"></canvas></div>
+  <div class="panel span-6"><h2>Claude Code tool usage — last 30 days</h2>
+    <canvas id="toolChart"></canvas><div id="toolErr"></div></div>
+  <div class="panel span-6"><h2>Agent split — tokens</h2>
+    <canvas id="agentChart"></canvas></div>
+  <div class="panel span-8"><h2>Recent conversations</h2>
+    <ul id="convs"></ul></div>
+  <div class="panel span-4"><h2>Memory feed (Engram)</h2>
+    <ul id="mems"></ul></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt$ = v => "$" + v.toLocaleString(undefined, {maximumFractionDigits: 2});
+const fmtTok = v => v >= 1e9 ? (v/1e9).toFixed(1)+"B" : v >= 1e6 ? (v/1e6).toFixed(1)+"M"
+                  : v >= 1e3 ? (v/1e3).toFixed(0)+"k" : String(v);
+const ago = iso => {
+  if (!iso) return "";
+  const s = (Date.now() - new Date(iso)) / 1000;
+  if (s < 3600) return Math.max(1, Math.round(s/60)) + "m ago";
+  if (s < 86400) return Math.round(s/3600) + "h ago";
+  return Math.round(s/86400) + "d ago";
+};
+const PALETTE = ["#58a6ff","#d29922","#bc8cff","#3fb950","#f85149","#39c5cf","#db61a2"];
+Chart.defaults.color = "#8b949e";
+Chart.defaults.borderColor = "#21262d";
+
+function card(label, value, sub) {
+  return `<div class="card"><div class="label">${label}</div>
+          <div class="value">${value}</div><div class="sub">${sub||""}</div></div>`;
+}
+
+async function load() {
+  const [usage, tools, convs, mems] = await Promise.all(
+    ["usage","tools","conversations","memories"].map(p => fetch("/api/"+p).then(r => r.json())));
+  renderUsage(usage); renderTools(tools); renderConvs(convs); renderMems(mems);
+  $("status").textContent = "updated " + new Date().toLocaleTimeString();
+}
+
+function renderUsage(u) {
+  if (u.error) { $("dailyErr").innerHTML = `<div class="err">${u.error}</div>`;
+                 $("cards").innerHTML = card("usage", "—", u.error); return; }
+  const days = u.daily || [];
+  const monthKey = new Date().toISOString().slice(0,7);
+  const todayKey = new Date().toISOString().slice(0,10);
+  const total = days.reduce((s,d) => s + d.totalCost, 0);
+  const month = days.filter(d => d.period.startsWith(monthKey)).reduce((s,d) => s + d.totalCost, 0);
+  const today = days.filter(d => d.period === todayKey).reduce((s,d) => s + d.totalCost, 0);
+  const toks  = days.reduce((s,d) => s + d.totalTokens, 0);
+  const cacheRead = days.reduce((s,d) => s + (d.cacheReadTokens||0), 0);
+  const busiest = days.reduce((a,b) => a.totalCost > b.totalCost ? a : b, {totalCost:0});
+  const models = {};
+  days.forEach(d => (d.modelBreakdowns||[]).forEach(m => {
+    models[m.modelName] = (models[m.modelName]||0) + m.cost; }));
+
+  $("cards").innerHTML =
+    card("This month (API-equiv)", fmt$(month), "what this would cost pay-per-token") +
+    card("Today", fmt$(today)) +
+    card("All time", fmt$(total), days.length + " active days") +
+    card("Total tokens", fmtTok(toks), fmtTok(cacheRead) + " from cache (" +
+         Math.round(100*cacheRead/Math.max(1,toks)) + "%)") +
+    card("Busiest day", busiest.period || "—", fmt$(busiest.totalCost||0)) +
+    card("Models used", Object.keys(models).length, "across all agents");
+
+  // daily stacked by agent
+  const last30 = days.slice(-30);
+  const agents = [...new Set(last30.flatMap(d => d.metadata?.agents || ["claude"]))];
+  // ccusage daily rows aggregate all agents; approximate per-agent split via model names
+  const byAgent = name => last30.map(d => (d.modelBreakdowns||[])
+      .filter(m => name === "claude" ? m.modelName.startsWith("claude") : !m.modelName.startsWith("claude"))
+      .reduce((s,m) => s + m.cost, 0));
+  new Chart($("dailyChart"), { type: "bar",
+    data: { labels: last30.map(d => d.period.slice(5)),
+      datasets: [
+        { label: "claude", data: byAgent("claude"), backgroundColor: PALETTE[1], stack: "s" },
+        { label: "codex / other", data: byAgent("codex"), backgroundColor: PALETTE[0], stack: "s" }]},
+    options: { scales: { x: { stacked: true }, y: { stacked: true } },
+               plugins: { legend: { position: "bottom" } } } });
+
+  const sorted = Object.entries(models).sort((a,b) => b[1]-a[1]).slice(0,7);
+  new Chart($("modelChart"), { type: "doughnut",
+    data: { labels: sorted.map(e => e[0].replace("claude-","")),
+            datasets: [{ data: sorted.map(e => e[1]), backgroundColor: PALETTE,
+                         borderColor: "#161b22" }]},
+    options: { plugins: { legend: { position: "bottom" } }, cutout: "62%" } });
+
+  const agentToks = {};
+  days.forEach(d => (d.modelBreakdowns||[]).forEach(m => {
+    const a = m.modelName.startsWith("claude") ? "Claude Code" :
+              m.modelName.startsWith("gpt") ? "Codex" : "Other";
+    agentToks[a] = (agentToks[a]||0) + m.inputTokens + m.outputTokens +
+                   (m.cacheCreationTokens||0) + (m.cacheReadTokens||0); }));
+  new Chart($("agentChart"), { type: "bar",
+    data: { labels: Object.keys(agentToks),
+            datasets: [{ data: Object.values(agentToks),
+                         backgroundColor: [PALETTE[1], PALETTE[0], PALETTE[2]] }]},
+    options: { indexAxis: "y", plugins: { legend: { display: false } },
+               scales: { x: { ticks: { callback: fmtTok } } } } });
+}
+
+function renderTools(t) {
+  if (t.error) { $("toolErr").innerHTML = `<div class="err">${t.error}</div>`; return; }
+  const entries = Object.entries(t.counts || {}).sort((a,b) => b[1]-a[1]).slice(0,12);
+  new Chart($("toolChart"), { type: "bar",
+    data: { labels: entries.map(e => e[0].replace(/^mcp__/,"").slice(0,28)),
+            datasets: [{ data: entries.map(e => e[1]), backgroundColor: PALETTE[3] }]},
+    options: { indexAxis: "y", plugins: { legend: { display: false } } } });
+}
+
+function renderConvs(convs) {
+  if (convs.error) { $("convs").innerHTML = `<li class="err">${convs.error}</li>`; return; }
+  if (!convs.length) { $("convs").innerHTML = `<li class="empty">no sessions found</li>`; return; }
+  $("convs").innerHTML = convs.map(c => `
+    <li class="conv"><span class="badge ${c.agent}">${c.agent}</span>
+      <span class="proj">${c.project}</span>
+      <span class="title" title="${c.title.replace(/"/g,"&quot;")}">${c.title}</span>
+      <span class="when">${ago(c.time)}</span></li>`).join("");
+}
+
+function renderMems(mems) {
+  if (mems.error) { $("mems").innerHTML = `<li class="err">${mems.error}</li>`; return; }
+  if (!mems.length) { $("mems").innerHTML =
+    `<li class="empty">no memories yet — agents save here via mem_save</li>`; return; }
+  $("mems").innerHTML = mems.map(m => `
+    <li class="mem"><div class="head"><span class="type">${m.type}</span>
+      <span class="title">${m.title}</span>
+      <span class="when" style="color:var(--dim);font-size:11px;margin-left:auto">${ago(m.created_at.replace(" ","T")+"Z")}</span></div>
+      <div class="body">${m.content}</div></li>`).join("");
+}
+
+load();
+setInterval(load, 120000);
+</script>
+</body>
+</html>

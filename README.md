@@ -104,6 +104,31 @@ Register an MCP server with command `engram`, args `["mcp"]`, and env
 `ENGRAM_DATA_DIR=<repo>/data`. Point its instructions file at
 `agents/AGENTS.md`.
 
+## Dashboard
+
+A local web UI over all of the above — spend, tool usage, conversations,
+and memory in one place:
+
+```bash
+./dashboard/serve.sh        # → http://localhost:7788
+```
+
+Zero dependencies beyond Python 3 (Chart.js loads from CDN). Panels:
+
+- **Stat cards** — API-equivalent spend this month / today / all time (what
+  your subscription usage would cost pay-per-token), total tokens with cache
+  hit ratio, busiest day, models used
+- **Daily spend** — last 30 days, Claude vs Codex/other
+- **Cost by model** and **agent token split**
+- **Claude Code tool usage** — which tools (Bash, Edit, Read, MCP tools …)
+  you actually use and how often, mined from session logs
+- **Recent conversations** — unified across Claude Code and Codex, with
+  project and first prompt
+- **Memory feed** — latest Engram observations as agents save them
+
+All read-only over local data (`ccusage --json`, `~/.claude/projects`,
+`~/.codex/sessions`, `data/engram.db`). Binds to 127.0.0.1 only.
+
 ## Day-to-day usage
 
 **Check usage/costs** (reads local logs from all supported agents):
