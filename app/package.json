@@ -29,7 +29,8 @@
       "category": "public.app-category.developer-tools",
       "identity": null,
       "target": [{ "target": "dmg", "arch": ["universal"] }],
-      "artifactName": "llm-ground-zero-${version}-universal.dmg"
+      "artifactName": "llm-ground-zero-${version}-universal.dmg",
+      "x64ArchFiles": "**/ccusage"
     }
   }
 }
