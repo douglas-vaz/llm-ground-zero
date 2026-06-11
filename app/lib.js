@@ -108,7 +108,43 @@ function claudeToolCounts(projectsRoot, days = 30) {
   return counts;
 }
 
+function codexConversations(sessionsRoot, limit = 20) {
+  const files = byMtimeDesc(walkFiles(sessionsRoot).filter((f) =>
+    path.basename(f).startsWith("rollout-") && f.endsWith(".jsonl")));
+  const convs = [];
+  for (const file of files.slice(0, limit * 3)) {
+    let cwd = "", ts = "", title = null;
+    for (const row of iterJsonl(file)) {
+      const payload = row.payload || {};
+      if (row.type === "session_meta") {
+        cwd = payload.cwd || "";
+        ts = payload.timestamp || row.timestamp || "";
+      } else if (payload.type === "message" && payload.role === "user") {
+        const text = (payload.content || [])
+          .filter((b) => b && typeof b === "object")
+          .map((b) => b.text || "")
+          .join(" ");
+        if (isNoise(text)) continue;
+        title = text;
+        break;
+      }
+    }
+    if (title) {
+      convs.push({
+        agent: "codex",
+        project: cwd ? path.basename(cwd) : "?",
+        title: title.trim().slice(0, 160),
+        time: ts,
+        mtime: mtime(file),
+      });
+    }
+    if (convs.length >= limit) break;
+  }
+  return convs;
+}
+
 module.exports = {
   walkFiles, iterJsonl, firstText, isNoise,
   claudeConversations, claudeToolCounts,
+  codexConversations,
 };
