@@ -116,3 +116,31 @@ Unchanged philosophy from the Python server: each API endpoint catches its
 own data-source errors and returns `{"error": ...}` so one broken source
 never blanks the page. The Electron app shows the window even if all
 sources fail.
+
+## Error log file (shareable, anonymous)
+
+Purpose: a user who hits a bug can attach one file to a GitHub issue
+without leaking anything private.
+
+- **Location**: `~/Library/Logs/llm-ground-zero/error.log` (standard macOS
+  log directory, visible in Console.app). Created lazily on first error.
+- **What gets logged**: timestamp (ISO 8601), app version, component
+  (`usage` / `tools` / `conversations` / `memories` / `server` / `electron`),
+  error name + message, stack trace. Every API-endpoint catch block and the
+  Electron main process's `uncaughtException`/`unhandledRejection` handlers
+  write here, in addition to returning `{"error": ...}` to the UI.
+- **Anonymization (enforced by a single `sanitize()` helper that all log
+  writes pass through)**:
+  - Home directory replaced with `~` in all paths and messages
+    (`/Users/<name>/...` → `~/...`), catching usernames embedded in stacks.
+  - Never log payload data: no conversation text, prompts, memory contents,
+    project names, file contents, or parsed records — only the error and
+    where it happened. Error messages from parsers must be constructed from
+    static strings + sanitized paths, not from data being parsed.
+  - No IPs, no hostnames, no environment variable dumps.
+- **Rotation**: cap at 1 MB; on exceeding, rename to `error.log.1`
+  (keep one previous file). No external logging library — a ~40-line module
+  (`app/log.js`) with its own unit tests, including a test that a path
+  containing the home directory comes out sanitized.
+- README's troubleshooting section tells users where the file is and that
+  it is safe to share.
