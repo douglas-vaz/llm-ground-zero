@@ -1,56 +1,88 @@
 # llm-ground-zero
 
-A reproducible local setup that makes multiple CLI coding agents (Claude
-Code, Codex CLI, Gemini CLI, ...) behave like one continuous assistant:
-shared memory when you switch models mid-task, a searchable index of
-personal context, and usage tracking across all of them.
+> One memory, every coding agent. A shared brain + usage dashboard for
+> Claude Code, Codex CLI, Gemini CLI and friends — on subscription plans,
+> with no API keys.
 
-Works with subscription plans — no pay-per-token API keys required anywhere.
+![Dashboard](docs/assets/dashboard.png)
+
+I built this because I kept switching between CLI coding agents mid-task —
+Claude Code for one thing, Codex for another — and every switch meant
+starting from zero. Each agent had amnesia about decisions the previous one
+made. And since I'm on subscription plans, I had no idea what my usage would
+actually cost in API terms. If you run more than one coding agent, this can
+be useful to you too.
 
 ## What you get
 
-| Capability | How | Tool |
-|---|---|---|
-| Shared preferences & conventions | `agents/AGENTS.md`, loaded by every agent | plain markdown |
-| Project handoff between models | `context/<project>/handoff.md`, written at session end, read at session start | plain markdown + protocol in AGENTS.md |
-| Searchable cross-agent memory | MCP server all agents connect to; full-text search over decisions, gotchas, preferences | [Engram](https://github.com/Gentleman-Programming/engram) (Go binary, SQLite+FTS5, zero deps) |
-| Personal document index | ingest via `engram save` / HTTP API, recall via `mem_search` from any agent | Engram |
-| Usage / token / cost tracking | parses each agent's local session logs | [ccusage](https://github.com/ryoppippi/ccusage), [tokscale](https://github.com/junhoyeo/tokscale) |
+- **A menu-launchable macOS app** showing spend (API-equivalent $), tool
+  usage, recent conversations across agents, and your agents' shared memory
+  feed — all reading from local files, no server required
+- **Shared memory between agents** — switch from Claude Code to Codex
+  mid-task and it picks up where the other left off, via file-based handoffs
+  and a searchable Engram memory store over MCP
+- **No API keys anywhere** — built for subscription plans
 
-### How the two memory tiers work
+## Install
 
-- **Tier 1 — files, always loaded.** Preferences and active project state
-  live in markdown that agents read natively. No retrieval step, no misses.
-- **Tier 2 — Engram, searchable.** Long-tail memory (decisions, learnings,
-  documents) lives in one SQLite file at `data/engram.db`, exposed to every
-  agent over MCP. Backup = copy the file.
+**The app:**
 
-The handoff flow when switching models mid-task: agent A writes
-`context/<project>/handoff.md` at session end → you open agent B → it reads
-the handoff and `mem_search`es for related memories → continues where A left off.
-
-## Quick start
-
-```bash
-git clone <this-repo> ~/llm-ground-zero
-cd ~/llm-ground-zero
-./setup.sh
+```
+brew install --cask --no-quarantine douglasvaz/tap/llm-ground-zero
 ```
 
-`setup.sh` is idempotent and ends with a report of what it configured and
-what it skipped. It:
+`--no-quarantine` because the app is unsigned — it's open source, read it
+before running it if that concerns you.
 
-1. Installs Engram (brew or `go install`), ccusage, tokscale (npm)
-2. Registers Engram as an MCP server with every detected agent
-3. Wires `agents/AGENTS.md` into each agent's global instructions
-4. Creates `data/` for the Engram database
+No Homebrew? Grab the `.dmg` from [GitHub Releases](https://github.com/douglasvaz/llm-ground-zero/releases).
 
-Restart your agents afterwards so they pick up the MCP server.
+No app needed? Run the browser-only dashboard instead:
 
-## Per-agent setup details
+```bash
+cd app && npm run serve   # → http://localhost:7788
+```
 
-`setup.sh` does all of this automatically; the manual equivalents are
-documented here for troubleshooting or unsupported agents.
+**The agent wiring** (shared memory, AGENTS.md, usage tools):
+
+```bash
+git clone https://github.com/douglasvaz/llm-ground-zero ~/llm-ground-zero
+cd ~/llm-ground-zero && ./setup.sh
+```
+
+`setup.sh` is idempotent. It installs Engram, ccusage, and tokscale; registers
+the Engram MCP server with every detected agent; and wires `agents/AGENTS.md`
+into each agent's global instructions. Restart your agents afterwards.
+
+## How it works
+
+Memory lives in two tiers.
+
+**Tier 1 — files, always loaded.** Each agent reads
+`~/llm-ground-zero/context/<project>/handoff.md` at session start. No
+retrieval step, no misses. When you switch agents mid-task, the outgoing
+agent writes a handoff and the incoming one reads it.
+
+**Tier 2 — Engram, searchable.** Long-tail memory (decisions, gotchas,
+personal preferences) lives in a single SQLite file at
+`~/llm-ground-zero/data/engram.db`, exposed to every agent over MCP. Any
+agent can call `mem_search` to recall relevant past decisions across all your
+projects. Backup = copy the file.
+
+The dashboard reads: `ccusage` data for spend, `~/.claude/projects` for
+Claude conversations and tool usage, `~/.codex/sessions` for Codex
+conversations, and `engram.db` for the memory feed. All read-only, all local,
+binds to 127.0.0.1 only.
+
+## Troubleshooting
+
+If a panel shows an error, check `~/Library/Logs/llm-ground-zero/error.log`.
+The log contains only anonymized error data — no conversation content,
+usernames, or file paths — so it is safe to attach to a GitHub issue.
+
+## Per-agent reference
+
+`setup.sh` handles all of this automatically. The manual equivalents are here
+for troubleshooting or agents the script does not yet support.
 
 ### Claude Code
 
@@ -61,7 +93,7 @@ claude mcp add --scope user engram --env ENGRAM_DATA_DIR="$HOME/llm-ground-zero/
 Shared instructions: `~/.claude/CLAUDE.md` gets the import line
 `@/Users/<you>/llm-ground-zero/agents/AGENTS.md`.
 
-Verify: run `claude mcp list` — engram should be listed and connected.
+Verify: `claude mcp list` — engram should be listed and connected.
 
 ### Codex CLI
 
@@ -101,42 +133,17 @@ Shared instructions: `~/.gemini/GEMINI.md` gets a pointer line referencing
 ### Any other MCP-capable agent
 
 Register an MCP server with command `engram`, args `["mcp"]`, and env
-`ENGRAM_DATA_DIR=<repo>/data`. Point its instructions file at
+`ENGRAM_DATA_DIR=~/llm-ground-zero/data`. Point its instructions file at
 `agents/AGENTS.md`.
-
-## Dashboard
-
-A local web UI over all of the above — spend, tool usage, conversations,
-and memory in one place:
-
-```bash
-./dashboard/serve.sh        # → http://localhost:7788
-```
-
-Zero dependencies beyond Python 3 (Chart.js loads from CDN). Panels:
-
-- **Stat cards** — API-equivalent spend this month / today / all time (what
-  your subscription usage would cost pay-per-token), total tokens with cache
-  hit ratio, busiest day, models used
-- **Daily spend** — last 30 days, Claude vs Codex/other
-- **Cost by model** and **agent token split**
-- **Claude Code tool usage** — which tools (Bash, Edit, Read, MCP tools …)
-  you actually use and how often, mined from session logs
-- **Recent conversations** — unified across Claude Code and Codex, with
-  project and first prompt
-- **Memory feed** — latest Engram observations as agents save them
-
-All read-only over local data (`ccusage --json`, `~/.claude/projects`,
-`~/.codex/sessions`, `data/engram.db`). Binds to 127.0.0.1 only.
 
 ## Day-to-day usage
 
-**Check usage/costs** (reads local logs from all supported agents):
+**Check spend and usage** (reads local session logs from all supported agents):
 
 ```bash
 ccusage          # daily report
 ccusage blocks   # 5-hour billing-window view
-tokscale         # visual dashboard
+tokscale         # visual breakdown
 ```
 
 **Add a document to the personal index:**
@@ -148,17 +155,6 @@ engram search "query"          # or from any agent via the mem_search tool
 
 **Inspect memory:** `engram` (TUI) or `engram serve` (HTTP API on :7437).
 
-## Shipping this to someone else
+## License
 
-The repo is the whole setup. They clone it, run `./setup.sh`, done. The only
-machine state outside the repo is each agent's config (written idempotently
-by the script) and the globally installed binaries. `data/` (the memory DB)
-is gitignored — private by default; copy it manually if you want to transfer
-memories.
-
-## Upgrade path: semantic search
-
-Tier-2 search is keyword (FTS5). If recall over documents needs to be
-semantic, swap in an embeddings-based server (OpenMemory + Ollama, fully
-local) without touching Tier 1 or usage tracking. See the design doc:
-`docs/superpowers/specs/2026-06-10-llm-ground-zero-design.md`.
+MIT — © Douglas Vas
