@@ -60,6 +60,49 @@ into each agent's global instructions. Restart your agents afterwards.
 
 ## How it works
 
+```mermaid
+flowchart LR
+    subgraph agents["CLI coding agents"]
+        CC["Claude Code"]
+        CX["Codex CLI"]
+        GM["Gemini CLI"]
+    end
+
+    subgraph shared["Shared memory (this repo)"]
+        HF["AGENTS.md +<br>context/&lt;project&gt;/handoff.md"]
+        EN["Engram MCP server"]
+        DB[("data/engram.db")]
+    end
+
+    subgraph sessions["Session logs (written by the agents)"]
+        CL["~/.claude/projects"]
+        CO["~/.codex/sessions"]
+    end
+
+    APP["LLM Ground Zero.app<br>127.0.0.1:7788"]
+    CU["ccusage"]
+
+    CC -- "mem_save / mem_search" --> EN
+    CX -- "mem_save / mem_search" --> EN
+    GM -- "mem_save / mem_search" --> EN
+    EN --> DB
+    CC -. "read at start,<br>write at end" .-> HF
+    CX -.-> HF
+    GM -.-> HF
+    CC --> CL
+    CX --> CO
+
+    CU -- "parses for spend" --> CL
+    CU --> CO
+    APP -- "spend panel" --> CU
+    APP -- "conversations,<br>tool usage" --> CL
+    APP --> CO
+    APP -- "memory feed" --> DB
+```
+
+Every arrow out of the app is a local, read-only file access — the app never
+writes to agent data and nothing leaves your machine.
+
 Memory lives in two tiers.
 
 **Tier 1 — files, always loaded.** Each agent reads
@@ -159,6 +202,24 @@ engram search "query"          # or from any agent via the mem_search tool
 ```
 
 **Inspect memory:** `engram` (TUI) or `engram serve` (HTTP API on :7437).
+
+## Built on
+
+This project is mostly glue around excellent open-source work — credit where
+it's due:
+
+- [Engram](https://github.com/Gentleman-Programming/engram) — the keyless,
+  single-binary memory engine (Go, SQLite + FTS5) behind the shared agent
+  memory. The reason this works without an API key.
+- [ccusage](https://github.com/ryoppippi/ccusage) — parses agent session
+  logs into token counts and API-equivalent costs; powers the entire spend
+  panel.
+- [tokscale](https://github.com/junhoyeo/tokscale) — terminal usage
+  visualizations, installed by `setup.sh`.
+- [Electron](https://www.electronjs.org/) and
+  [electron-builder](https://www.electron.build/) — the app shell and the
+  dmg packaging.
+- [Chart.js](https://www.chartjs.org/) — every chart on the dashboard.
 
 ## License
 
