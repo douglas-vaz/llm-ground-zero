@@ -13,7 +13,12 @@
   brew install --cask llm-ground-zero`, then
   `xattr -dr com.apple.quarantine` (unsigned → Gatekeeper blocks).
 - Python `dashboard/` deleted; headless mode is `cd app && npm run serve`.
-  Tests: `cd app && npm test` (11 node:test tests).
+  Tests: `cd app && npm test` (12 node:test tests).
+- v0.1.1 added the app icon; v0.1.2 added the current-5h-block card
+  (`/api/blocks` via `ccusage blocks --json`), a manual refresh button
+  (`?fresh=1` busts the 60s cache), and fixed a Chart.js canvas-reuse bug
+  on re-render (mkChart destroys before recreating). App stays read-only —
+  memory deletion was considered and explicitly rejected.
 - Core agent wiring unchanged: `setup.sh`, `agents/AGENTS.md`, Engram MCP.
 
 ## Recent decisions
