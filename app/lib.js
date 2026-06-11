@@ -143,8 +143,29 @@ function codexConversations(sessionsRoot, limit = 20) {
   return convs;
 }
 
+// Latest non-deleted Engram observations via the macOS-bundled sqlite3 CLI.
+// Read-only; safe if DB missing. Caller logs errors — but note any error
+// thrown here may contain the db path, so callers must sanitize (log.js does).
+function recentMemories(dbPath, limit = 15) {
+  if (!fs.existsSync(dbPath)) return [];
+  const sql = `SELECT type, title, substr(content,1,240) AS content,
+      coalesce(project,'') AS project, created_at
+    FROM observations WHERE deleted_at IS NULL
+    ORDER BY created_at DESC LIMIT ${Number(limit)};`;
+  let out;
+  try {
+    out = execFileSync("/usr/bin/sqlite3",
+      ["-json", "-readonly", dbPath, sql],
+      { encoding: "utf8", timeout: 10000 });
+  } catch {
+    return [];
+  }
+  try { return JSON.parse(out); } catch { return []; } // empty result = ""
+}
+
 module.exports = {
   walkFiles, iterJsonl, firstText, isNoise,
   claudeConversations, claudeToolCounts,
   codexConversations,
+  recentMemories,
 };

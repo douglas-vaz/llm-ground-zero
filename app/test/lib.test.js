@@ -80,3 +80,24 @@ test("codexConversations reads meta and skips env context", () => {
   assert.strictEqual(convs[0].project, "officebrew");
   assert.strictEqual(convs[0].title, "Build the brew scheduler");
 });
+
+test("recentMemories reads non-deleted observations", () => {
+  const dir = tmp();
+  const db = path.join(dir, "engram.db");
+  const sql = `CREATE TABLE observations (
+      id INTEGER PRIMARY KEY, session_id TEXT, type TEXT, title TEXT,
+      content TEXT, project TEXT, created_at TEXT, deleted_at TEXT);
+    INSERT INTO observations (session_id,type,title,content,project,created_at)
+      VALUES ('s','note','setup test','hello','llm-ground-zero','2026-06-10 10:00:00');
+    INSERT INTO observations (session_id,type,title,content,project,created_at,deleted_at)
+      VALUES ('s','note','deleted one','x','p','2026-06-10 11:00:00','2026-06-10 12:00:00');`;
+  require("node:child_process").execFileSync("/usr/bin/sqlite3", [db, sql]);
+  const mems = lib.recentMemories(db, 10);
+  assert.strictEqual(mems.length, 1);
+  assert.strictEqual(mems[0].title, "setup test");
+  assert.strictEqual(mems[0].content, "hello");
+});
+
+test("recentMemories returns [] for missing db", () => {
+  assert.deepStrictEqual(lib.recentMemories("/no/such/engram.db", 10), []);
+});
