@@ -1,0 +1,30 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: macos-latest
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"   # unsigned by design
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+        working-directory: app
+      - run: npm test
+        working-directory: app
+      - run: npm run dist
+        working-directory: app
+      - name: checksum
+        run: shasum -a 256 app/dist/*.dmg | tee app/dist/SHA256SUMS
+      - name: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            app/dist/*.dmg app/dist/SHA256SUMS \
+            --title "${GITHUB_REF_NAME}" --generate-notes
