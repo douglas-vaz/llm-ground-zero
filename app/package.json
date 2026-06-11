@@ -1,7 +1,7 @@
 {
   "name": "llm-ground-zero",
   "productName": "LLM Ground Zero",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local dashboard for CLI coding agents — spend, tool usage, conversations, shared memory",
   "main": "main.js",
   "license": "MIT",
@@ -23,15 +23,34 @@
   "build": {
     "appId": "com.douglasvaz.llm-ground-zero",
     "productName": "LLM Ground Zero",
-    "directories": { "output": "dist" },
-    "files": ["main.js", "server.js", "lib.js", "log.js", "static/**"],
-    "asarUnpack": ["node_modules/ccusage/**", "node_modules/@ccusage/**"],
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "server.js",
+      "lib.js",
+      "log.js",
+      "static/**"
+    ],
+    "asarUnpack": [
+      "node_modules/ccusage/**",
+      "node_modules/@ccusage/**"
+    ],
     "mac": {
       "category": "public.app-category.developer-tools",
       "identity": null,
-      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
       "artifactName": "llm-ground-zero-${version}-universal.dmg",
-      "x64ArchFiles": "**/ccusage"
+      "x64ArchFiles": "**/ccusage",
+      "icon": "build/icon.icns"
     }
   }
 }
