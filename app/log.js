@@ -16,7 +16,7 @@ function logError(component, err, { file = LOG_FILE, version = "dev" } = {}) {
   const line = JSON.stringify({
     ts: new Date().toISOString(),
     version,
-    component,
+    component: sanitize(component),
     error: sanitize((err && err.name) || "Error"),
     message: sanitize((err && err.message) || String(err)),
     stack: sanitize((err && err.stack) || ""),
