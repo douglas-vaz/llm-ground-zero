@@ -10,6 +10,7 @@
     "start": "electron .",
     "serve": "node server.js",
     "test": "node --test",
+    "predist": "npm install --no-save --force @ccusage/ccusage-darwin-x64 @ccusage/ccusage-darwin-arm64",
     "dist": "electron-builder --mac --universal"
   },
   "dependencies": {
@@ -24,7 +25,7 @@
     "productName": "LLM Ground Zero",
     "directories": { "output": "dist" },
     "files": ["main.js", "server.js", "lib.js", "log.js", "static/**"],
-    "asarUnpack": ["node_modules/ccusage/**"],
+    "asarUnpack": ["node_modules/ccusage/**", "node_modules/@ccusage/**"],
     "mac": {
       "category": "public.app-category.developer-tools",
       "identity": null,
