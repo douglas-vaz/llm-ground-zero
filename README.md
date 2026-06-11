@@ -15,9 +15,9 @@ be useful to you too.
 
 ## What you get
 
-- **A menu-launchable macOS app** showing spend (API-equivalent $), tool
-  usage, recent conversations across agents, and your agents' shared memory
-  feed — all reading from local files, no server required
+- **A macOS app** showing spend (API-equivalent $), tool usage, recent
+  conversations across agents, and your agents' shared memory feed — all
+  read from local files, nothing leaves your machine
 - **Shared memory between agents** — switch from Claude Code to Codex
   mid-task and it picks up where the other left off, via file-based handoffs
   and a searchable Engram memory store over MCP
