@@ -90,8 +90,15 @@ function startServer(port = 7788) {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(body);
     } else if (url === "/" || url === "/index.html") {
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(fs.readFileSync(path.join(STATIC_DIR, "index.html")));
+      try {
+        const html = fs.readFileSync(path.join(STATIC_DIR, "index.html"));
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(html);
+      } catch (e) {
+        logError("static", e, { version: VERSION });
+        res.writeHead(500);
+        res.end("could not load dashboard");
+      }
     } else {
       res.writeHead(404);
       res.end("not found");
