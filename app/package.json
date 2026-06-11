@@ -9,7 +9,7 @@
   "scripts": {
     "start": "electron .",
     "serve": "node server.js",
-    "test": "node --test test/",
+    "test": "node --test",
     "dist": "electron-builder --mac --universal"
   },
   "dependencies": {
