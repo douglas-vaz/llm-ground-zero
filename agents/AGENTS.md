@@ -31,7 +31,7 @@ Do not save routine actions or anything derivable from the code itself.
 **At the end of a significant session** (made meaningful changes or decisions):
 1. Create/update `~/llm-ground-zero/context/<project>/handoff.md` using the
    template in `~/llm-ground-zero/context/README.md` — current state, recent
-   decisions, next steps, and a `_Last updated_` line naming you (agent + model).
+   decisions, next steps, and a `_Last updated_` line.
 2. Keep it under ~100 lines; it is a handoff, not a log. Prune stale entries.
 
 ## User preferences

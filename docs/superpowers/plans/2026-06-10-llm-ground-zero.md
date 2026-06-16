@@ -48,7 +48,7 @@ Decision — reason. One line each.
 ## Next steps
 Ordered list.
 
-_Last updated: YYYY-MM-DD by <agent/model>_
+_Last updated: YYYY-MM-DD_
 \```
 
 Agents update the relevant `handoff.md` at the end of significant sessions
