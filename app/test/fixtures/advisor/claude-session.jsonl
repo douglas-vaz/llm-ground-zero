@@ -1,0 +1,8 @@
+{"type":"user","sessionId":"claude-fixture-1","timestamp":"2026-07-10T10:00:00.000Z","cwd":"/workspace/sample-product","message":{"role":"user","content":"Use the repository test command and feature branch policy before changing checkout code."}}
+{"type":"assistant","sessionId":"claude-fixture-1","timestamp":"2026-07-10T10:01:00.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"tool-1","name":"Read","input":{"file_path":"/workspace/sample-product/src/checkout.js"}}]}}
+{"type":"user","sessionId":"claude-fixture-1","timestamp":"2026-07-10T10:01:10.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tool-1","content":"source text"}]}}
+{"type":"assistant","sessionId":"claude-fixture-1","timestamp":"2026-07-10T10:02:00.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"tool-2","name":"Bash","input":{"command":"npm test"}}]}}
+{"type":"user","sessionId":"claude-fixture-1","timestamp":"2026-07-10T10:02:20.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tool-2","content":"12 passing"}]}}
+{"type":"assistant","sessionId":"claude-fixture-1","timestamp":"2026-07-10T10:03:00.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"tool-3","name":"Bash","input":{"command":"git commit -m fixture"}}]}}
+{"type":"user","sessionId":"claude-fixture-1","timestamp":"2026-07-10T10:03:10.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tool-3","content":"[feature abc1234] fixture"}]}}
+{"type":"assistant","sessionId":"claude-fixture-1","timestamp":"2026-07-10T10:04:00.000Z","message":{"role":"assistant","content":[{"type":"text","text":"The checkout fix is tested and committed."}]}}

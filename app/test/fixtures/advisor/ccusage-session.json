@@ -1,0 +1,26 @@
+{
+  "session": [
+    {
+      "agent": "claude",
+      "period": "claude-fixture-1",
+      "inputTokens": 1000,
+      "outputTokens": 300,
+      "cacheReadTokens": 2000,
+      "cacheCreationTokens": 100,
+      "totalTokens": 3400,
+      "totalCost": 4.25,
+      "metadata": { "lastActivity": "2026-07-10T10:04:00.000Z" }
+    },
+    {
+      "agent": "codex",
+      "period": "2026/07/11/rollout-codex-fixture-1",
+      "inputTokens": 800,
+      "outputTokens": 200,
+      "cacheReadTokens": 900,
+      "cacheCreationTokens": 0,
+      "totalTokens": 1900,
+      "totalCost": 0,
+      "metadata": { "lastActivity": "2026-07-11T09:04:00.000Z" }
+    }
+  ]
+}

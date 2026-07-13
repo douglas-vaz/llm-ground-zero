@@ -1,0 +1,9 @@
+{"timestamp":"2026-07-11T09:00:00.000Z","type":"session_meta","payload":{"id":"codex-fixture-1","cwd":"/workspace/sample-research","timestamp":"2026-07-11T09:00:00.000Z"}}
+{"timestamp":"2026-07-11T09:00:05.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Compare pricing sources and record the selected launch assumption."}]}}
+{"timestamp":"2026-07-11T09:01:00.000Z","type":"response_item","payload":{"type":"function_call","call_id":"call-1","name":"mcp__engram__mem_search","arguments":"{\"query\":\"launch assumptions\"}"}}
+{"timestamp":"2026-07-11T09:01:10.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call-1","output":"prior launch decision"}}
+{"timestamp":"2026-07-11T09:02:00.000Z","type":"response_item","payload":{"type":"function_call","call_id":"call-2","name":"exec_command","arguments":"{\"cmd\":\"npm test\"}"}}
+{"timestamp":"2026-07-11T09:02:30.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call-2","output":"Process exited with code 1"}}
+{"timestamp":"2026-07-11T09:03:00.000Z","type":"response_item","payload":{"type":"function_call","call_id":"call-3","name":"exec_command","arguments":"{\"cmd\":\"npm test\"}"}}
+{"timestamp":"2026-07-11T09:03:20.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call-3","output":"Process exited with code 0"}}
+{"timestamp":"2026-07-11T09:04:00.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"The research brief is complete."}]}}
