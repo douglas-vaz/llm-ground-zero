@@ -18,6 +18,9 @@ be useful to you too.
 - **A macOS app** showing spend (API-equivalent $), tool usage, recent
   conversations across agents, and your agents' shared memory feed — all
   read from local files, nothing leaves your machine
+- **An AI Usage Advisor** that turns those local records into an outcome
+  ledger, explainable workflow-friction signals, reusable-knowledge prompts,
+  and evidence-backed next actions
 - **Shared memory between agents** — switch from Claude Code to Codex
   mid-task and it picks up where the other left off, via file-based handoffs
   and a searchable Engram memory store over MCP
@@ -103,7 +106,9 @@ flowchart LR
 ```
 
 Every arrow out of the app is a local, read-only file access — the app never
-writes to agent data and nothing leaves your machine.
+writes to agent data and nothing leaves your machine. The advisor writes only
+your explicit subscription settings and outcome corrections to an app-owned
+JSON file. It never edits session logs, shared handoffs, or Engram memories.
 
 Memory lives in two tiers.
 
@@ -120,8 +125,33 @@ projects. Backup = copy the file.
 
 The dashboard reads: `ccusage` data for spend, `~/.claude/projects` for
 Claude conversations and tool usage, `~/.codex/sessions` for Codex
-conversations, and `engram.db` for the memory feed. All read-only, all local,
-binds to 127.0.0.1 only.
+conversations, and `engram.db` for the memory feed. All agent-owned sources
+are read-only and local, and the server binds to `127.0.0.1` only.
+
+## AI Usage Advisor
+
+The app opens on an advisory overview with four connected views:
+
+- **Overview** summarizes outcome yield, activity allocation, pricing coverage,
+  plan fit, and up to three ranked recommendations.
+- **Waste audit** detects explainable patterns such as repeated briefings,
+  repeated file reads, failure churn, and explicit reverts. Each signal includes
+  confidence, recurrence, estimated impact, and inspectable evidence.
+- **Outcome ledger** cautiously classifies sessions as shipped, completed,
+  paused, or unreviewed. You can correct the status, type, and note; your manual
+  classification always wins.
+- **Knowledge** surfaces observed captures and memory-assisted sessions, then
+  suggests decisions or recurring workflows that may be worth saving.
+
+The original spend, charts, conversations, tools, and memory feed remain in the
+**Usage** view. The shared 7/30/90-day range control refreshes advisor analysis;
+settings let you enter subscription costs for plan-fit context.
+
+Advisor recommendations are deterministic heuristics, not model judgments.
+They show confidence and data coverage, treat unsupported zero-dollar pricing
+as **unpriced** rather than free, and avoid cancellation advice until there is
+enough history and pricing coverage. Draft CTAs only preview and copy text: they
+never silently write rules, context packs, decisions, skills, or memories.
 
 ## Troubleshooting
 

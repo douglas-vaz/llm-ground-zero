@@ -1,7 +1,9 @@
 # AI Usage Advisor — Product and Technical Specification
 
-**Date:** 2026-07-13  
-**Status:** Approved for implementation  
+**Date:** 2026-07-13
+
+**Status:** Approved for implementation
+
 **Branch:** `codex/ai-usage-advisor`
 
 ## 1. Summary

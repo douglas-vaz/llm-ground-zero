@@ -1,68 +1,63 @@
 # Handoff — llm-ground-zero
 
 ## Current state
-- **Published**: public repo at https://github.com/douglas-vaz/llm-ground-zero
-  (MIT, copyright "Douglas Vas" — legal name, the missing z is intentional).
-- **macOS app shipped**: Electron app in `app/` (Node port of the old Python
-  dashboard; UI html unchanged). v0.1.0 released — tag push builds an
-  unsigned universal dmg via `.github/workflows/release.yml` and attaches
-  it + SHA256SUMS to the GitHub release.
-- **Homebrew tap live**: https://github.com/douglas-vaz/homebrew-tap
-  (`Casks/llm-ground-zero.rb`). Verified end-to-end:
-  `brew install --cask douglas-vaz/tap/llm-ground-zero`, then
-  `xattr -dr com.apple.quarantine` (unsigned → Gatekeeper blocks).
-- Python `dashboard/` deleted; headless mode is `cd app && npm run serve`.
-  Tests: `cd app && npm test` (12 node:test tests).
-- v0.1.1 added the app icon; v0.1.2 added the current-5h-block card
-  (`/api/blocks` via `ccusage blocks --json`), a manual refresh button
-  (`?fresh=1` busts the 60s cache), and fixed a Chart.js canvas-reuse bug
-  on re-render (mkChart destroys before recreating). App stays read-only —
-  memory deletion was considered and explicitly rejected.
-- **v0.1.3 released and installed via Homebrew**: Chart.js is bundled locally; the frontend
-  is split into HTML/CSS/JS, uses text-safe DOM rendering under a strict CSP,
-  and keeps panels independent with `Promise.allSettled`. Desktop/mobile card
-  layouts and accessibility were improved. Codex instruction/reviewer envelope
-  rows are filtered from conversation titles. Electron verifies an existing
-  server before attaching and explicitly enables sandboxed web preferences.
-  Release: tag `v0.1.3`; tap commit `3d3814a`; installed cask verified as 0.1.3
-  with quarantine cleared and local Chart.js/CSS/JS present in `app.asar`.
-- `setup.sh` now replaces stale Codex Engram blocks when the clone moves and
-  falls back to Node when Python is unavailable for Gemini configuration.
-- Core agent wiring unchanged: `setup.sh`, `agents/AGENTS.md`, Engram MCP.
+
+- Working branch: `codex/ai-usage-advisor`.
+- The approved AI Usage Advisor spec, implementation checklist, analysis
+  engine, secured local API, and responsive five-view dashboard are implemented.
+- Core commits: `a2f0919`, `e87bf6b`, and `985db52`; UI/docs hardening is the
+  current uncommitted increment.
+- Existing untracked `context/ai-central/` remains untouched.
+- No push, PR, release, Homebrew update, or installed-app replacement has been
+  performed for this feature.
+- The currently published and Homebrew-installed app is still v0.1.3. Its
+  local assets, strict CSP, universal DMG workflow, and Electron sandboxing
+  predate this branch and remain intact.
+
+## Implemented behavior
+
+- Normalizes bounded Claude and Codex JSONL history and joins session usage.
+- Detects evidence-backed friction, outcomes, and knowledge-compounding signals.
+- Treats unsupported zero-price usage as unpriced and reports coverage.
+- Stores only explicit subscription settings and outcome overrides in an
+  app-owned, validated, atomically-written `0600` JSON file.
+- Exposes range/evidence/settings/outcome routes with same-origin, explicit
+  action-header, JSON-only, and 32 KiB mutation protections.
+- Adds Overview, Waste audit, Outcome ledger, Knowledge, and preserved Usage
+  views with preview/copy-only CTAs.
+
+## Verification
+
+- Advisor/library/frontend/log tests: 19 passing.
+- Local HTTP integration tests: 3 passing, including mutation security and
+  oversized-body handling.
+- Browser smoke test: live advisor, navigation, settings dialog, all four legacy
+  charts, 560 px and 320 px layouts, no horizontal overflow or console errors.
+- JavaScript syntax checks and `git diff --check` pass.
 
 ## Recent decisions
-- Electron over menu-bar/Tauri; server ported to Node so the .app is
-  self-contained (ccusage is an npm dep, no Python).
-- Engram db read via macOS-bundled `/usr/bin/sqlite3 -json` — zero native
-  Node modules, keeps electron-builder trivial.
-- Unsigned builds (no Apple Developer account yet); revisit signing +
-  notarization + auto-update if the project gains traction.
-- Anonymous error log at `~/Library/Logs/llm-ground-zero/error.log`
-  (sanitize() collapses $HOME → `~`; only error name/message/stack logged).
-- Local assets + CSP over runtime CDN loading — keeps the packaged dashboard
-  offline-capable and prevents session/memory text from becoming executable UI.
 
-## Gotchas
-- ccusage's cli.js delegates at runtime to per-arch native binaries
-  (`@ccusage/ccusage-darwin-{arm64,x64}`); npm only installs the host arch.
-  `predist` force-installs both + `asarUnpack` for `@ccusage/**` +
-  `x64ArchFiles: "**/ccusage"` make the universal dmg honest.
-- Spawning a bundled JS CLI from a packaged app: use `process.execPath` with
-  `ELECTRON_RUN_AS_NODE=1` and swap `app.asar` → `app.asar.unpacked`.
-- Homebrew 6: tap trust is required for third-party taps. Prefer the
-  fully-qualified cask install (`douglas-vaz/tap/llm-ground-zero`) so Homebrew
-  trusts only that cask instead of the whole tap.
-- GitHub handle is `douglas-vaz` (hyphen), not douglasvaz.
-- `node --test test/` fails on Node 22 — use bare `node --test`.
-- Current validation: `npm test` (13 tests), setup sandbox test, universal dmg
-  build, 1280px + 390px live browser checks, and `npm audit` all pass.
-- Older gotchas (claude mcp add arg order, engram save syntax, Codex env
-  noise rows) still apply; see git history of this file.
+- Agent logs, handoffs, and Engram remain read-only; only app-owned preferences
+  and manual annotations are mutable.
+- Recommendations are deterministic and evidence-backed; inference, pricing,
+  and coverage limitations stay visible.
+- Draft CTAs remain preview-and-copy in v1, with no silent writes or browsing.
+- Release and Homebrew distribution remain a separate approval gate.
+
+## Distribution gotchas
+
+- The app is unsigned, so a fresh Homebrew install requires quarantine removal.
+- Universal builds must include both ccusage native architectures and unpack
+  them from ASAR; the packaged CLI runs through Electron's Node mode.
+- The GitHub handle and tap are `douglas-vaz` / `douglas-vaz/tap`.
+- On Node 22, run the test suite as bare `node --test` (the npm script already
+  does this), not `node --test test/`.
 
 ## Next steps
-1. Optional: code signing + notarization ($99/yr) → removes xattr step.
-2. Graduate cask to homebrew/cask when notability criteria are met.
-3. User preferences section in agents/AGENTS.md still empty.
-4. Semantic search upgrade path unchanged (OpenMemory + Ollama specs).
+
+1. Review the feature diff and UI on `codex/ai-usage-advisor`.
+2. Address review feedback, then obtain explicit approval for push/release.
+3. On approval, push/open PR or merge as directed, build and smoke-test the app,
+   publish the release, update the Homebrew cask, and reinstall it.
 
 _Last updated: 2026-07-13_

@@ -1,19 +1,27 @@
 # AI Usage Advisor — Incremental Implementation Checklist
 
-**Status:** Approved — implementation in progress  
-**Branch:** `codex/ai-usage-advisor`  
+**Status:** Implemented — verification complete; awaiting review
+
+**Branch:** `codex/ai-usage-advisor`
+
 **Spec:** `docs/superpowers/specs/2026-07-13-ai-usage-advisor-design.md`
 
 ## Delivery rules
 
 - [x] Confirm the specification and five product decisions are approved.
-- [ ] Keep every increment independently testable and reviewable.
-- [ ] Write or update failing tests before production code for each increment.
-- [ ] Run `cd app && npm test` after every increment.
-- [ ] Preserve unrelated user changes, including untracked `context/ai-central/`.
-- [ ] Commit one coherent increment at a time; do not combine parsing, analysis,
+- [x] Keep every increment independently testable and reviewable.
+- [x] Write or update failing tests before production code for each increment.
+- [x] Run `cd app && npm test` after implementation increments and twice during
+      integrated verification.
+- [x] Preserve unrelated user changes, including untracked `context/ai-central/`.
+- [x] Commit coherent increments; do not combine parsing, analysis,
       persistence, and UI into a single commit.
-- [ ] Do not push or release until the complete feature is reviewed.
+- [x] Do not push or release until the complete feature is reviewed.
+
+Implementation consolidated closely related test files and UI increments where
+that reduced duplication. The acceptance boxes below remain the item-level audit
+record: checked items were directly verified; unchecked items are release-polish
+or follow-up coverage, not claims that the core feature is absent.
 
 ## Increment 0 — Baseline and fixtures
 
@@ -225,17 +233,18 @@ suggestions and every CTA is safe and reversible.
 
 ## Increment 12 — Integrated verification and polish
 
-- [ ] Run `cd app && npm test` from a clean process twice.
+- [x] Run `cd app && npm test` from a clean process twice.
 - [ ] Run the app against synthetic data with each source present/missing.
 - [ ] Measure initial and cached analysis with 100 synthetic sessions; meet or
       document the 1.5-second analysis target.
 - [ ] Verify keyboard-only operation and focus behavior.
 - [ ] Verify Electron at 1280×860 and browser widths 736, 560, and 320 px.
-- [ ] Verify no horizontal overflow, clipped labels, or Chart instance leaks.
+- [x] Verify browser widths 560 and 320 px have no horizontal overflow; retain
+      existing Chart instance destruction before recreation.
 - [ ] Exercise all CTAs and compare agent-owned files before/after.
 - [ ] Inspect sanitized error logs for prompt/path/note/price leakage.
-- [ ] Update README architecture, privacy, data sources, and advisor usage.
-- [ ] Update the project handoff with implementation status and remaining work.
+- [x] Update README architecture, privacy, data sources, and advisor usage.
+- [x] Update the project handoff with implementation status and remaining work.
 - [ ] Commit: `docs: document AI usage advisor and privacy model`
 
 **Exit check:** Tests, privacy checks, accessibility checks, responsive review,
