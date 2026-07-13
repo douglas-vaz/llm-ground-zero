@@ -18,12 +18,14 @@
   (`?fresh=1` busts the 60s cache), and fixed a Chart.js canvas-reuse bug
   on re-render (mkChart destroys before recreating). App stays read-only —
   memory deletion was considered and explicitly rejected.
-- **Main after v0.1.2 is hardened**: Chart.js is bundled locally; the frontend
+- **v0.1.3 released and installed via Homebrew**: Chart.js is bundled locally; the frontend
   is split into HTML/CSS/JS, uses text-safe DOM rendering under a strict CSP,
   and keeps panels independent with `Promise.allSettled`. Desktop/mobile card
   layouts and accessibility were improved. Codex instruction/reviewer envelope
   rows are filtered from conversation titles. Electron verifies an existing
   server before attaching and explicitly enables sandboxed web preferences.
+  Release: tag `v0.1.3`; tap commit `3d3814a`; installed cask verified as 0.1.3
+  with quarantine cleared and local Chart.js/CSS/JS present in `app.asar`.
 - `setup.sh` now replaces stale Codex Engram blocks when the clone moves and
   falls back to Node when Python is unavailable for Gemini configuration.
 - Core agent wiring unchanged: `setup.sh`, `agents/AGENTS.md`, Engram MCP.
@@ -61,7 +63,6 @@
 1. Optional: code signing + notarization ($99/yr) → removes xattr step.
 2. Graduate cask to homebrew/cask when notability criteria are met.
 3. User preferences section in agents/AGENTS.md still empty.
-4. Cut the next app release and update the Homebrew cask for the hardening pass.
-5. Semantic search upgrade path unchanged (OpenMemory + Ollama specs).
+4. Semantic search upgrade path unchanged (OpenMemory + Ollama specs).
 
 _Last updated: 2026-07-13_
