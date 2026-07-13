@@ -14,4 +14,11 @@ test("frontend uses local assets and safe DOM rendering", () => {
   assert.ok(!js.includes("insertAdjacentHTML"));
   assert.ok(js.includes("Promise.allSettled"));
   assert.ok(js.includes("localDateKey"));
+  assert.ok(html.includes('data-view="overview"'));
+  assert.ok(html.includes('data-view="usage"'));
+  assert.ok(html.includes('id="outcomeDialog"'));
+  assert.ok(html.includes('id="settingsDialog"'));
+  assert.ok(js.includes('"X-LLM-Ground-Zero-Action": "1"'));
+  assert.ok(js.includes("navigator.clipboard.writeText"));
+  assert.ok(!html.includes("onclick="));
 });

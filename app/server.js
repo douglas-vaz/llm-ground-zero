@@ -129,15 +129,18 @@ function readJsonBody(req, maxBytes = 32 * 1024) {
       return;
     }
     let body = "";
+    let tooLarge = false;
     req.setEncoding("utf8");
     req.on("data", (chunk) => {
+      if (tooLarge) return;
       body += chunk;
       if (Buffer.byteLength(body) > maxBytes) {
+        tooLarge = true;
         reject(Object.assign(new Error("request body too large"), { status: 413 }));
-        req.destroy();
       }
     });
     req.on("end", () => {
+      if (tooLarge) return;
       try { resolve(JSON.parse(body || "{}")); }
       catch { reject(Object.assign(new Error("invalid JSON"), { status: 400 })); }
     });

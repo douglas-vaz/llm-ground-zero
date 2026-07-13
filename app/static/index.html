@@ -10,8 +10,22 @@
 </head>
 <body>
   <header class="app-header">
-    <h1>llm-<span>ground</span>-zero</h1>
+    <div class="brand-lockup">
+      <div class="brand-mark" aria-hidden="true">◎</div>
+      <div>
+        <h1>llm-<span>ground</span>-zero</h1>
+        <p>Personal AI usage advisor</p>
+      </div>
+    </div>
     <div id="status" role="status" aria-live="polite">loading…</div>
+    <label class="range-control" for="range">
+      <span>Range</span>
+      <select id="range">
+        <option value="7d">7 days</option>
+        <option value="30d">30 days</option>
+        <option value="90d">90 days</option>
+      </select>
+    </label>
     <button id="refresh" type="button" aria-label="Refresh dashboard data"
             title="Bypass the cache and refresh all panels">
       <span aria-hidden="true">↻</span>
@@ -20,16 +34,78 @@
   </header>
 
   <main>
-    <section class="cards" id="cards" aria-label="Usage summary">
-      <div class="card placeholder" aria-hidden="true"></div>
-      <div class="card placeholder" aria-hidden="true"></div>
-      <div class="card placeholder" aria-hidden="true"></div>
-      <div class="card placeholder" aria-hidden="true"></div>
-      <div class="card placeholder" aria-hidden="true"></div>
-      <div class="card placeholder" aria-hidden="true"></div>
+    <nav class="view-tabs" aria-label="Dashboard views">
+      <button type="button" data-view="overview" aria-pressed="true">Overview</button>
+      <button type="button" data-view="waste" aria-pressed="false">Waste audit</button>
+      <button type="button" data-view="outcomes" aria-pressed="false">Outcome ledger</button>
+      <button type="button" data-view="knowledge" aria-pressed="false">Knowledge</button>
+      <button type="button" data-view="usage" aria-pressed="false">Usage</button>
+    </nav>
+
+    <section class="view" id="view-overview" data-view-panel="overview" aria-labelledby="overview-heading">
+      <div class="section-heading">
+        <div><h2 id="overview-heading">Your AI week</h2><p>Outcomes, avoidable work, and the next best actions.</p></div>
+        <span id="advisorCoverage" class="coverage"></span>
+      </div>
+      <section class="cards advisor-cards" id="overviewCards" aria-label="Advisor summary">
+        <div class="card placeholder" aria-hidden="true"></div>
+        <div class="card placeholder" aria-hidden="true"></div>
+        <div class="card placeholder" aria-hidden="true"></div>
+      </section>
+      <div class="advisor-grid">
+        <section class="panel allocation-panel" aria-labelledby="allocation-heading">
+          <h2 id="allocation-heading">Where your active AI time went</h2>
+          <div id="allocationBar" class="allocation-bar" role="img" aria-label="Loading activity allocation"></div>
+          <div id="allocationLegend" class="allocation-legend"></div>
+        </section>
+        <section class="panel plan-panel" aria-labelledby="plan-heading">
+          <div class="panel-heading"><h2 id="plan-heading">Plan fit</h2><button type="button" class="text-button" data-action="settings">Edit plans</button></div>
+          <div id="planFit"></div>
+        </section>
+      </div>
+      <section class="panel action-panel" aria-labelledby="actions-heading">
+        <div class="panel-heading"><h2 id="actions-heading">Highest-leverage next moves</h2><span>Ranked by recoverable effort</span></div>
+        <div id="recommendations" class="action-list"></div>
+      </section>
+      <p id="overviewState" class="panel-state" aria-live="polite"></p>
     </section>
 
-    <div class="grid">
+    <section class="view" id="view-waste" data-view-panel="waste" aria-labelledby="waste-heading" hidden>
+      <div class="section-heading"><div><h2 id="waste-heading">Waste audit</h2><p>Repeated work and recovery patterns grounded in session evidence.</p></div></div>
+      <section class="cards advisor-cards" id="wasteCards" aria-label="Waste summary"></section>
+      <section class="panel action-panel"><div id="wasteSignals" class="action-list"></div></section>
+      <p id="wasteState" class="panel-state" aria-live="polite"></p>
+    </section>
+
+    <section class="view" id="view-outcomes" data-view-panel="outcomes" aria-labelledby="outcomes-heading" hidden>
+      <div class="section-heading"><div><h2 id="outcomes-heading">Outcome ledger</h2><p>What shipped, what completed, and what is worth resuming.</p></div></div>
+      <section class="cards advisor-cards" id="outcomeCards" aria-label="Outcome summary"></section>
+      <section class="panel ledger-panel">
+        <div class="ledger-head" aria-hidden="true"><span>Work</span><span>Status</span><span>Usage</span><span></span></div>
+        <div id="outcomeLedger" class="ledger"></div>
+      </section>
+      <p id="outcomeState" class="panel-state" aria-live="polite"></p>
+    </section>
+
+    <section class="view" id="view-knowledge" data-view-panel="knowledge" aria-labelledby="knowledge-heading" hidden>
+      <div class="section-heading"><div><h2 id="knowledge-heading">Knowledge compounder</h2><p>Capture, reuse, and repeatable workflows from your sessions.</p></div></div>
+      <section class="cards advisor-cards" id="knowledgeCards" aria-label="Knowledge summary"></section>
+      <section class="panel action-panel"><div id="knowledgeSignals" class="action-list"></div></section>
+      <p id="knowledgeState" class="panel-state" aria-live="polite"></p>
+    </section>
+
+    <section class="view" id="view-usage" data-view-panel="usage" aria-labelledby="usage-heading" hidden>
+      <div class="section-heading"><div><h2 id="usage-heading">Usage details</h2><p>Raw spend, tokens, tools, conversations, and memory activity.</p></div></div>
+      <section class="cards" id="cards" aria-label="Usage summary">
+        <div class="card placeholder" aria-hidden="true"></div>
+        <div class="card placeholder" aria-hidden="true"></div>
+        <div class="card placeholder" aria-hidden="true"></div>
+        <div class="card placeholder" aria-hidden="true"></div>
+        <div class="card placeholder" aria-hidden="true"></div>
+        <div class="card placeholder" aria-hidden="true"></div>
+      </section>
+
+      <div class="grid">
       <section class="panel span-8" aria-labelledby="daily-heading">
         <h2 id="daily-heading">Daily spend — last 30 days (API-equivalent $)</h2>
         <canvas id="dailyChart">Daily spend chart</canvas>
@@ -58,7 +134,45 @@
         <h2 id="memory-heading">Memory feed (Engram)</h2>
         <ul id="mems"></ul>
       </section>
-    </div>
+      </div>
+    </section>
   </main>
+
+  <dialog id="evidenceDialog" aria-labelledby="evidenceTitle">
+    <div class="dialog-head"><h2 id="evidenceTitle">Evidence</h2><button type="button" class="icon-button" data-close="evidenceDialog" aria-label="Close evidence">×</button></div>
+    <p id="evidenceDetail"></p>
+    <ul id="evidenceList" class="evidence-list"></ul>
+    <div class="dialog-actions"><button type="button" data-close="evidenceDialog">Done</button></div>
+  </dialog>
+
+  <dialog id="draftDialog" aria-labelledby="draftTitle">
+    <div class="dialog-head"><h2 id="draftTitle">Draft</h2><button type="button" class="icon-button" data-close="draftDialog" aria-label="Close draft">×</button></div>
+    <textarea id="draftText" rows="14" aria-label="Generated draft"></textarea>
+    <div class="dialog-actions"><button type="button" id="copyDraft" class="primary">Copy draft</button><button type="button" data-close="draftDialog">Done</button></div>
+    <p id="draftState" class="panel-state" role="status" aria-live="polite"></p>
+  </dialog>
+
+  <dialog id="outcomeDialog" aria-labelledby="outcomeDialogTitle">
+    <form id="outcomeForm">
+      <div class="dialog-head"><h2 id="outcomeDialogTitle">Mark outcome</h2><button type="button" class="icon-button" data-close="outcomeDialog" aria-label="Close outcome editor">×</button></div>
+      <input type="hidden" id="outcomeSessionId">
+      <label>Status<select id="outcomeStatus" required><option value="shipped">Shipped</option><option value="completed">Completed</option><option value="paused">Paused</option><option value="abandoned">Abandoned</option><option value="unreviewed">Unreviewed</option></select></label>
+      <label>Type<select id="outcomeType" required><option value="code">Code</option><option value="research">Research</option><option value="document">Document</option><option value="prototype">Prototype</option><option value="operations">Operations</option><option value="other">Other</option></select></label>
+      <label>Note<textarea id="outcomeNote" rows="3" maxlength="500" placeholder="Optional context for future you"></textarea></label>
+      <div class="dialog-actions"><button type="submit" class="primary">Save outcome</button><button type="button" id="clearOutcome">Clear override</button></div>
+      <p id="outcomeFormState" class="panel-state" role="status" aria-live="polite"></p>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog" aria-labelledby="settingsTitle">
+    <form id="settingsForm">
+      <div class="dialog-head"><h2 id="settingsTitle">Subscription plans</h2><button type="button" class="icon-button" data-close="settingsDialog" aria-label="Close settings">×</button></div>
+      <p>Used only for local plan-fit comparisons. Prices stay on this Mac.</p>
+      <div id="subscriptionRows" class="subscription-rows"></div>
+      <button type="button" id="addSubscription">Add plan</button>
+      <div class="dialog-actions"><button type="submit" class="primary">Save plans</button><button type="button" data-close="settingsDialog">Cancel</button></div>
+      <p id="settingsState" class="panel-state" role="status" aria-live="polite"></p>
+    </form>
+  </dialog>
 </body>
 </html>

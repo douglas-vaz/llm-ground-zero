@@ -4,6 +4,8 @@ const byId = (id) => document.getElementById(id);
 const PALETTE = ["#58a6ff", "#d29922", "#bc8cff", "#3fb950", "#f85149", "#39c5cf", "#db61a2"];
 const charts = new Map();
 let loadInFlight = false;
+let advisorData = null;
+let lastEvidence = null;
 
 if (typeof Chart !== "undefined") {
   Chart.defaults.color = "#9da7b3";
@@ -35,6 +37,17 @@ function formatTokens(value) {
   if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
   if (v >= 1e3) return (v / 1e3).toFixed(0) + "k";
   return String(v);
+}
+
+function formatDuration(value) {
+  const minutes = Math.max(0, Math.round(number(value) / 60000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+}
+
+function percent(value, total) {
+  return total > 0 ? Math.max(0, Math.min(100, 100 * number(value) / total)) : 0;
 }
 
 function localDateKey(date = new Date()) {
@@ -292,8 +305,181 @@ function renderMemories(memories) {
   list.replaceChildren(...nodes);
 }
 
+function replaceCards(id, items) {
+  byId(id).replaceChildren(...items);
+}
+
+function advisorError(message) {
+  for (const id of ["overviewState", "wasteState", "outcomeState", "knowledgeState"]) {
+    setPanelState(id, message, true);
+  }
+}
+
+function addLegend(container, className, label, value) {
+  const item = element("span", "legend-item");
+  item.append(element("span", `legend-dot ${className}`), element("span", "", `${label} ${formatDuration(value)}`));
+  container.append(item);
+}
+
+function signalById(id) {
+  if (!advisorData) return null;
+  return [
+    ...(advisorData.overview?.recommendations || []),
+    ...(advisorData.friction?.signals || []),
+    ...(advisorData.knowledge?.signals || []),
+  ].find((item) => item.id === id) || null;
+}
+
+function draftKind(signal) {
+  if (signal.type === "repeated_briefing") return "rule";
+  if (signal.type === "failure_churn" || signal.type === "repeated_read") return "context";
+  if (signal.type === "reusable_workflow") return "skill";
+  if (signal.type === "source_review") return "checklist";
+  return "decision";
+}
+
+function draftLabel(kind) {
+  return ({ rule: "Draft rule", context: "Context pack", skill: "Create skill", checklist: "Review checklist", decision: "Capture decision" })[kind] || "Create draft";
+}
+
+function actionRows(id, items, context) {
+  const container = byId(id);
+  if (!items.length) {
+    container.replaceChildren(element("p", "empty", context === "waste" ? "No repeated friction patterns met the evidence threshold." : "No actionable patterns yet."));
+    return;
+  }
+  const nodes = items.map((item, index) => {
+    const row = element("article", "action-row");
+    const copy = element("div", "action-copy");
+    copy.append(element("div", "action-title", context === "overview" ? `${index + 1}. ${item.title}` : item.title));
+    copy.append(element("div", "action-detail", item.detail));
+    const meta = element("div", "action-meta");
+    meta.append(
+      element("span", "", `${Math.round(number(item.confidence) * 100)}% confidence`),
+      element("span", "", `${number(item.occurrences)} signal${number(item.occurrences) === 1 ? "" : "s"}`),
+    );
+    if (item.activeMs) meta.append(element("span", "", `~${formatDuration(item.activeMs)}`));
+    copy.append(meta);
+    const actions = element("div", "action-buttons");
+    const kind = draftKind(item);
+    const draft = element("button", context === "overview" && index === 0 ? "primary" : "", draftLabel(kind));
+    draft.type = "button"; draft.dataset.action = "draft"; draft.dataset.signalId = item.id; draft.dataset.draftKind = kind;
+    const evidence = element("button", "", "See evidence");
+    evidence.type = "button"; evidence.dataset.action = "evidence"; evidence.dataset.signalId = item.id;
+    actions.append(draft, evidence);
+    row.append(copy, actions);
+    return row;
+  });
+  container.replaceChildren(...nodes);
+}
+
+function renderOverview(data) {
+  const metrics = data.overview.metrics;
+  const coverage = data.coverage || {};
+  const frictionValue = coverage.pricingPercent >= 50 && metrics.frictionCost > 0
+    ? formatMoney(metrics.frictionCost) : formatDuration(metrics.frictionMs);
+  replaceCards("overviewCards", [
+    card("Outcome yield", `${metrics.outcomeYield}%`, `${metrics.outcomeCount} of ${metrics.eligibleSessions} sessions completed`),
+    card("Estimated avoidable usage", frictionValue, coverage.pricingPercent >= 50 ? `${coverage.pricingPercent}% pricing coverage` : "time estimate · limited pricing coverage"),
+    card("Memory-assisted sessions", metrics.memoryAssisted, "Engram recall preceded a completion signal"),
+  ]);
+  byId("advisorCoverage").textContent = `${coverage.matchedSessions || 0}/${coverage.totalSessions || 0} sessions matched to usage`;
+
+  const allocation = data.overview.allocation;
+  const bar = byId("allocationBar");
+  const parts = [
+    ["allocation-productive", allocation.productiveMs],
+    ["allocation-exploration", allocation.explorationMs],
+    ["allocation-friction", allocation.frictionMs],
+  ].map(([className, value]) => {
+    const node = element("span", className);
+    node.style.width = `${percent(value, allocation.totalMs)}%`;
+    return node;
+  });
+  bar.replaceChildren(...parts);
+  bar.setAttribute("aria-label", `Estimated active time: ${formatDuration(allocation.productiveMs)} productive, ${formatDuration(allocation.explorationMs)} exploration, ${formatDuration(allocation.frictionMs)} friction`);
+  const legend = byId("allocationLegend");
+  legend.replaceChildren();
+  addLegend(legend, "allocation-productive", "Productive", allocation.productiveMs);
+  addLegend(legend, "allocation-exploration", "Exploration", allocation.explorationMs);
+  addLegend(legend, "allocation-friction", "Friction", allocation.frictionMs);
+
+  const fit = data.overview.planFit;
+  const plan = byId("planFit");
+  if (!fit.configured) {
+    plan.replaceChildren(element("div", "plan-value", "Not configured"), element("p", "plan-copy", fit.recommendation));
+  } else {
+    plan.replaceChildren(
+      element("div", "plan-value", formatMoney(fit.difference)),
+      element("p", "plan-copy", `API-equivalent value above plan cost · ${fit.pricingPercent}% pricing coverage`),
+      element("p", "plan-copy", fit.recommendation),
+    );
+  }
+  actionRows("recommendations", data.overview.recommendations || [], "overview");
+  setPanelState("overviewState", coverage.warnings?.length ? `${coverage.warnings.length} source coverage warning${coverage.warnings.length === 1 ? "" : "s"}.` : "");
+}
+
+function renderWaste(data) {
+  const metrics = data.friction.metrics;
+  replaceCards("wasteCards", [
+    card("Estimated friction", formatDuration(metrics.frictionMs), "bounded active-time estimate"),
+    card("Detected patterns", metrics.signals, "only signals above evidence thresholds"),
+    card("Active AI time", formatDuration(metrics.totalActiveMs), `${data.coverage.pricingPercent || 0}% pricing coverage`),
+  ]);
+  actionRows("wasteSignals", data.friction.signals || [], "waste");
+  setPanelState("wasteState");
+}
+
+function renderOutcomes(data) {
+  const metrics = data.outcomes.metrics;
+  replaceCards("outcomeCards", [
+    card("Completed outcomes", metrics.outcomes, `${metrics.yieldPercent}% of eligible sessions`),
+    card("Cost per priced outcome", metrics.costPerOutcome === null ? "—" : formatMoney(metrics.costPerOutcome), `${metrics.pricedOutcomes} priced outcome${metrics.pricedOutcomes === 1 ? "" : "s"}`),
+    card("Worth resuming", metrics.paused, "manually marked paused sessions"),
+  ]);
+  const rows = (data.outcomes.sessions || []).map((session) => {
+    const row = element("article", "ledger-row");
+    const work = element("div", "");
+    work.append(element("div", "ledger-title", session.title), element("div", "ledger-meta", `${session.agent} · ${session.project} · ${ago(session.lastActivityAt)}`));
+    const status = element("div", "");
+    status.append(element("span", `status-pill ${session.outcome.source === "manual" ? "manual" : ""}`, session.outcome.status));
+    status.append(element("div", "ledger-meta", `${session.outcome.type} · ${Math.round(session.outcome.confidence * 100)}%`));
+    const usage = element("div", "usage-meta", session.usage?.matched
+      ? `${formatTokens(session.usage.totalTokens)} tokens · ${session.usage.priced ? formatMoney(session.usage.costUSD) : "unpriced"}`
+      : "usage unmatched");
+    const edit = element("button", "", "Edit");
+    edit.type = "button"; edit.dataset.action = "outcome"; edit.dataset.sessionId = session.id;
+    row.append(work, status, usage, edit);
+    return row;
+  });
+  byId("outcomeLedger").replaceChildren(...(rows.length ? rows : [element("p", "empty", "No eligible sessions in this range.")]));
+  setPanelState("outcomeState");
+}
+
+function renderKnowledge(data) {
+  const metrics = data.knowledge.metrics;
+  replaceCards("knowledgeCards", [
+    card("Captured knowledge", metrics.captured, "successful memory saves in session logs"),
+    card("Memory-assisted", metrics.assisted, "recall preceded a completion signal"),
+    card("Suggested captures", metrics.suggested, "repeated context not yet saved"),
+  ]);
+  actionRows("knowledgeSignals", data.knowledge.signals || [], "knowledge");
+  setPanelState("knowledgeState");
+}
+
+function renderAdvisor(data) {
+  if (data.error) { advisorError(data.error); return; }
+  advisorData = data;
+  renderOverview(data);
+  renderWaste(data);
+  renderOutcomes(data);
+  renderKnowledge(data);
+}
+
 async function fetchJson(source, fresh) {
-  const response = await fetch(`/api/${source}${fresh ? "?fresh=1" : ""}`);
+  const range = byId("range").value;
+  const path = source === "advisor" ? `/api/advisor?range=${encodeURIComponent(range)}` : `/api/${source}`;
+  const response = await fetch(`${path}${fresh ? (path.includes("?") ? "&fresh=1" : "?fresh=1") : ""}`);
   if (!response.ok) throw new Error(`${source} returned HTTP ${response.status}`);
   return response.json();
 }
@@ -307,10 +493,11 @@ async function load(fresh = false) {
   loadInFlight = true;
   byId("status").textContent = fresh ? "refreshing…" : "loading…";
   byId("refresh").disabled = true;
-  const sources = ["usage", "blocks", "tools", "conversations", "memories"];
+  const sources = ["advisor", "usage", "blocks", "tools", "conversations", "memories"];
   try {
     const results = await Promise.allSettled(sources.map((source) => fetchJson(source, fresh)));
     const data = Object.fromEntries(results.map((result, index) => [sources[index], settledValue(result, sources[index])]));
+    renderAdvisor(data.advisor);
     renderSummaries(data.usage, data.blocks);
     renderUsageCharts(data.usage);
     renderTools(data.tools);
@@ -328,6 +515,185 @@ async function load(fresh = false) {
   }
 }
 
+function selectView(name, updateHash = true) {
+  const valid = ["overview", "waste", "outcomes", "knowledge", "usage"];
+  const selected = valid.includes(name) ? name : "overview";
+  document.querySelectorAll("[data-view]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.view === selected)));
+  document.querySelectorAll("[data-view-panel]").forEach((panel) => { panel.hidden = panel.dataset.viewPanel !== selected; });
+  if (updateHash && location.hash !== `#${selected}`) history.pushState(null, "", `#${selected}`);
+}
+
+function showDialog(id) {
+  const dialog = byId(id);
+  if (!dialog.open) dialog.showModal();
+}
+
+function closeDialog(id) {
+  const dialog = byId(id);
+  if (dialog.open) dialog.close();
+}
+
+async function evidenceFor(id) {
+  const response = await fetch(`/api/advisor/evidence?range=${encodeURIComponent(byId("range").value)}&id=${encodeURIComponent(id)}`);
+  if (!response.ok) throw new Error("Could not load evidence.");
+  return response.json();
+}
+
+async function openEvidence(id) {
+  const signal = signalById(id);
+  byId("evidenceTitle").textContent = signal?.title || "Evidence";
+  byId("evidenceDetail").textContent = signal?.detail || "";
+  byId("evidenceList").replaceChildren(element("li", "empty", "Loading evidence…"));
+  showDialog("evidenceDialog");
+  try {
+    const result = await evidenceFor(id);
+    const nodes = result.evidence.map((item) => {
+      const row = element("li");
+      row.append(element("strong", "", item.label || "Evidence"), element("p", "", item.excerpt || ""), element("time", "when", ago(item.at)));
+      return row;
+    });
+    byId("evidenceList").replaceChildren(...(nodes.length ? nodes : [element("li", "empty", "No evidence excerpt available.")]));
+  } catch (error) {
+    byId("evidenceList").replaceChildren(element("li", "err", error.message));
+  }
+}
+
+function makeDraft(kind, signal, evidence) {
+  const lines = evidence.map((item) => `- ${item.label}: ${item.excerpt}`).join("\n");
+  if (kind === "rule") return `# Proposed AGENTS.md rule\n\n## Rule\nBefore working in ${signal.projects.join(", ")}, load and follow the established repository test and workflow conventions.\n\n## Why\n${signal.detail}\n\n## Evidence\n${lines}`;
+  if (kind === "context") return `# Context pack\n\n## Project\n${signal.projects.join(", ")}\n\n## Observed friction\n${signal.detail}\n\n## Relevant evidence\n${lines}\n\n## Next action\nResume from the last successful step and avoid rereading unchanged context.`;
+  if (kind === "skill") return `# Reusable workflow skill\n\n## Trigger\nUse for repeated ${signal.projects.join(", ")} work.\n\n## Workflow\n1. Load the project context and prior decisions.\n2. Execute the observed successful tool sequence.\n3. Verify the result with the project test command.\n4. Capture the outcome and reusable decisions.\n\n## Evidence\n${lines}`;
+  if (kind === "checklist") return `# Source verification checklist\n\n${evidence.map((item) => `- [ ] Review ${item.excerpt}`).join("\n")}`;
+  return `# Decision capture\n\n## Decision\n[State the decision]\n\n## Reason\n${signal.detail}\n\n## Alternatives considered\n- [Add rejected alternative]\n\n## Evidence\n${lines}`;
+}
+
+async function openDraft(id, kind) {
+  const signal = signalById(id);
+  byId("draftTitle").textContent = draftLabel(kind);
+  byId("draftText").value = "Loading evidence…";
+  byId("draftState").textContent = "";
+  showDialog("draftDialog");
+  try {
+    const result = await evidenceFor(id);
+    lastEvidence = result.evidence;
+    byId("draftText").value = makeDraft(kind, signal, result.evidence);
+  } catch (error) {
+    byId("draftText").value = "";
+    byId("draftState").textContent = error.message;
+  }
+}
+
+async function mutate(path, method, body) {
+  const response = await fetch(path, {
+    method,
+    headers: { "Content-Type": "application/json", "X-LLM-Ground-Zero-Action": "1" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Could not save changes.");
+  return result;
+}
+
+function openOutcomeEditor(id) {
+  const session = advisorData?.outcomes.sessions.find((item) => item.id === id);
+  if (!session) return;
+  byId("outcomeSessionId").value = id;
+  byId("outcomeStatus").value = session.outcome.status;
+  byId("outcomeType").value = session.outcome.type;
+  byId("outcomeNote").value = session.outcome.note || "";
+  byId("outcomeFormState").textContent = "";
+  showDialog("outcomeDialog");
+}
+
+function subscriptionRow(value = {}) {
+  const row = element("div", "subscription-row");
+  for (const [label, name, type, fieldValue] of [
+    ["Provider", "provider", "text", value.provider || ""], ["Plan", "plan", "text", value.plan || ""],
+    ["Monthly", "monthlyPrice", "number", value.monthlyPrice ?? ""], ["Currency", "currency", "text", value.currency || "USD"],
+  ]) {
+    const wrapper = element("label", "", label);
+    const input = element("input"); input.name = name; input.type = type; input.value = fieldValue;
+    if (type === "number") { input.min = "0"; input.step = "0.01"; input.required = true; }
+    else input.required = true;
+    wrapper.append(input); row.append(wrapper);
+  }
+  const remove = element("button", "", "Remove"); remove.type = "button"; remove.dataset.action = "remove-plan";
+  row.append(remove);
+  return row;
+}
+
+async function openSettings() {
+  byId("settingsState").textContent = "";
+  showDialog("settingsDialog");
+  try {
+    const response = await fetch("/api/advisor/settings");
+    const data = await response.json();
+    const rows = data.subscriptions.map(subscriptionRow);
+    byId("subscriptionRows").replaceChildren(...(rows.length ? rows : [subscriptionRow()]));
+  } catch {
+    byId("settingsState").textContent = "Could not load plan settings.";
+  }
+}
+
+document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => selectView(button.dataset.view)));
+window.addEventListener("hashchange", () => selectView(location.hash.slice(1), false));
+document.querySelectorAll("[data-close]").forEach((button) => button.addEventListener("click", () => closeDialog(button.dataset.close)));
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+  if (button.dataset.action === "evidence") openEvidence(button.dataset.signalId);
+  else if (button.dataset.action === "draft") openDraft(button.dataset.signalId, button.dataset.draftKind);
+  else if (button.dataset.action === "outcome") openOutcomeEditor(button.dataset.sessionId);
+  else if (button.dataset.action === "settings") openSettings();
+  else if (button.dataset.action === "remove-plan") button.closest(".subscription-row").remove();
+});
+
+byId("copyDraft").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(byId("draftText").value);
+    byId("draftState").textContent = "Copied to clipboard.";
+  } catch { byId("draftState").textContent = "Clipboard unavailable; select and copy the draft manually."; }
+});
+
+byId("outcomeForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const id = byId("outcomeSessionId").value;
+  try {
+    await mutate(`/api/advisor/outcomes/${encodeURIComponent(id)}`, "PUT", {
+      status: byId("outcomeStatus").value, type: byId("outcomeType").value, note: byId("outcomeNote").value,
+    });
+    closeDialog("outcomeDialog");
+    await load(true);
+  } catch (error) { byId("outcomeFormState").textContent = error.message; }
+});
+
+byId("clearOutcome").addEventListener("click", async () => {
+  try {
+    await mutate(`/api/advisor/outcomes/${encodeURIComponent(byId("outcomeSessionId").value)}`, "DELETE");
+    closeDialog("outcomeDialog");
+    await load(true);
+  } catch (error) { byId("outcomeFormState").textContent = error.message; }
+});
+
+byId("addSubscription").addEventListener("click", () => byId("subscriptionRows").append(subscriptionRow()));
+byId("settingsForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const subscriptions = [...byId("subscriptionRows").querySelectorAll(".subscription-row")].map((row) => ({
+    provider: row.querySelector('[name="provider"]').value,
+    plan: row.querySelector('[name="plan"]').value,
+    monthlyPrice: number(row.querySelector('[name="monthlyPrice"]').value),
+    currency: row.querySelector('[name="currency"]').value,
+  }));
+  try {
+    await mutate("/api/advisor/settings", "PUT", { subscriptions });
+    closeDialog("settingsDialog");
+    await load(true);
+  } catch (error) { byId("settingsState").textContent = error.message; }
+});
+
 byId("refresh").addEventListener("click", () => load(true));
+byId("range").addEventListener("change", () => load(true));
+selectView(location.hash.slice(1) || "overview", false);
 load();
 setInterval(() => load(false), 120000);

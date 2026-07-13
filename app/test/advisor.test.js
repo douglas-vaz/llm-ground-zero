@@ -90,3 +90,11 @@ test("advisor state validates and writes atomically with private permissions", (
   assert.throws(() => store.validateSubscriptions([{ provider: "x", monthlyPrice: 1, path: "/tmp" }]));
   assert.throws(() => store.validateOutcome({ status: "invented", type: "code" }));
 });
+
+test("advisor state backs up corrupt data and returns defaults", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lgz-advisor-corrupt-"));
+  const file = path.join(dir, "advisor.json");
+  fs.writeFileSync(file, "not-json");
+  assert.deepStrictEqual(store.readState(file), store.defaults());
+  assert.ok(fs.readdirSync(dir).some((name) => name.startsWith("advisor.json.corrupt-")));
+});

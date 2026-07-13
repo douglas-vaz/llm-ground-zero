@@ -15,8 +15,15 @@ function defaults() { return { schemaVersion: 1, subscriptions: [], outcomes: {}
 function readState(file = statePath()) {
   try {
     const value = JSON.parse(fs.readFileSync(file, "utf8"));
-    return value && value.schemaVersion === 1 ? { ...defaults(), ...value } : defaults();
-  } catch { return defaults(); }
+    if (!value || value.schemaVersion !== 1 || !Array.isArray(value.subscriptions)
+        || !value.outcomes || typeof value.outcomes !== "object") throw new Error("invalid advisor state");
+    return { ...defaults(), ...value };
+  } catch {
+    if (fs.existsSync(file)) {
+      try { fs.renameSync(file, `${file}.corrupt-${Date.now()}`); } catch { /* read-only recovery */ }
+    }
+    return defaults();
+  }
 }
 
 function writeState(value, file = statePath()) {

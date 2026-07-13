@@ -83,6 +83,11 @@ test("advisor settings and outcomes require same-origin explicit mutations", asy
     assert.strictEqual(settings.status, 200);
     assert.strictEqual((await settings.json()).subscriptions[0].monthlyPrice, 20);
 
+    const oversized = await fetch(`${base}/api/advisor/settings`, {
+      method: "PUT", headers, body: JSON.stringify({ subscriptions: [], padding: "x".repeat(33 * 1024) }),
+    });
+    assert.strictEqual(oversized.status, 413);
+
     const outcome = await fetch(`${base}/api/advisor/outcomes/claude-abc123`, {
       method: "PUT", headers,
       body: JSON.stringify({ status: "paused", type: "prototype", note: "resume later" }),
