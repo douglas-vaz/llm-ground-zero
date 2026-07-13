@@ -22,3 +22,8 @@ test("frontend uses local assets and safe DOM rendering", () => {
   assert.ok(js.includes("navigator.clipboard.writeText"));
   assert.ok(!html.includes("onclick="));
 });
+
+test("electron package includes advisor runtime modules", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  assert.ok(pkg.build.files.includes("advisor/**"));
+});
