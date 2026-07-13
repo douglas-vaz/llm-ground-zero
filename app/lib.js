@@ -169,9 +169,23 @@ function recentMemories(dbPath, limit = 15) {
   try { return JSON.parse(out); } catch { return []; } // empty result = ""
 }
 
+function advisorMemories(dbPath, limit = 100) {
+  if (!fs.existsSync(dbPath)) return [];
+  const safeLimit = Math.max(1, Math.min(500, Number(limit) || 100));
+  const sql = `SELECT id, coalesce(session_id,'') AS session_id, type, title,
+      substr(content,1,2000) AS content, coalesce(project,'') AS project, created_at
+    FROM observations WHERE deleted_at IS NULL
+    ORDER BY created_at DESC LIMIT ${safeLimit};`;
+  try {
+    const out = execFileSync("/usr/bin/sqlite3", ["-json", "-readonly", dbPath, sql],
+      { encoding: "utf8", timeout: 10000 });
+    return JSON.parse(out || "[]");
+  } catch { return []; }
+}
+
 module.exports = {
   walkFiles, iterJsonl, firstText, isNoise,
   claudeConversations, claudeToolCounts,
   codexConversations,
-  recentMemories,
+  recentMemories, advisorMemories,
 };

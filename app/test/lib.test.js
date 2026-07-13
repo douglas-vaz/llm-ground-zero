@@ -107,3 +107,18 @@ test("recentMemories reads non-deleted observations", () => {
 test("recentMemories returns [] for missing db", () => {
   assert.deepStrictEqual(lib.recentMemories("/no/such/engram.db", 10), []);
 });
+
+test("advisorMemories includes stable join fields without deleted rows", () => {
+  const dir = tmp();
+  const db = path.join(dir, "engram.db");
+  const sql = `CREATE TABLE observations (
+      id INTEGER PRIMARY KEY, session_id TEXT, type TEXT, title TEXT,
+      content TEXT, project TEXT, created_at TEXT, deleted_at TEXT);
+    INSERT INTO observations (session_id,type,title,content,project,created_at)
+      VALUES ('session-1','decision','pricing','see https://example.test','sample','2026-01-01 10:00:00');`;
+  require("node:child_process").execFileSync("/usr/bin/sqlite3", [db, sql]);
+  const rows = lib.advisorMemories(db, 10);
+  assert.strictEqual(rows[0].id, 1);
+  assert.strictEqual(rows[0].session_id, "session-1");
+  assert.ok(rows[0].content.includes("https://example.test"));
+});

@@ -9,6 +9,10 @@ const path = require("node:path");
 const { execFile } = require("node:child_process");
 const lib = require("./lib");
 const { logError } = require("./log");
+const advisor = require("./advisor");
+const advisorParsers = require("./advisor/parsers");
+const advisorUsage = require("./advisor/usage");
+const advisorStore = require("./advisor/store");
 
 const HOME = os.homedir();
 const CLAUDE_PROJECTS = path.join(HOME, ".claude", "projects");
@@ -32,6 +36,7 @@ const CCUSAGE_CLI = path
 
 const cache = new Map();
 const CACHE_TTL = 60_000;
+const ADVISOR_RANGES = new Set([7, 30, 90]);
 
 async function cached(key, fn) {
   const hit = cache.get(key);
@@ -69,6 +74,129 @@ function ccusageJson(component, args) {
       }
     });
   });
+}
+
+function rangeDays(value) {
+  const parsed = Number(String(value || "7d").replace(/d$/, ""));
+  return ADVISOR_RANGES.has(parsed) ? parsed : null;
+}
+
+async function buildAdvisor(days) {
+  const sinceMs = Date.now() - days * 86400_000;
+  const loaded = advisorParsers.loadSessions({
+    claudeRoot: CLAUDE_PROJECTS, codexRoot: CODEX_SESSIONS, sinceMs,
+  });
+  const since = new Date(sinceMs).toISOString().slice(0, 10);
+  const usagePayload = await ccusageJson(`advisor-usage-${days}`, ["session", "--since", since]);
+  const joined = advisorUsage.joinUsage(loaded.sessions, usagePayload.error ? {} : usagePayload);
+  const result = advisor.analyze({
+    sessions: joined.sessions,
+    memories: lib.advisorMemories(ENGRAM_DB, 100),
+    state: advisorStore.readState(), rangeDays: days,
+    coverage: { ...joined.coverage, scannedSessions: loaded.scanned, warnings: loaded.warnings },
+  });
+  if (usagePayload.error) result.coverage.warnings.push({ type: "usage_unavailable" });
+  return result;
+}
+
+async function advisorResponse(days, fresh = false) {
+  const key = `advisor-${days}`;
+  if (fresh) cache.delete(key);
+  return cached(key, () => buildAdvisor(days));
+}
+
+function publicAdvisor(result) {
+  const { evidence, ...body } = result;
+  return body;
+}
+
+function json(res, status, value) {
+  writeHead(res, status, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(value));
+}
+
+function validMutation(req) {
+  const origin = req.headers.origin;
+  return req.headers["x-llm-ground-zero-action"] === "1"
+    && typeof origin === "string"
+    && origin === `http://${req.headers.host}`;
+}
+
+function readJsonBody(req, maxBytes = 32 * 1024) {
+  return new Promise((resolve, reject) => {
+    if (!String(req.headers["content-type"] || "").toLowerCase().startsWith("application/json")) {
+      reject(Object.assign(new Error("content type must be application/json"), { status: 415 }));
+      return;
+    }
+    let body = "";
+    req.setEncoding("utf8");
+    req.on("data", (chunk) => {
+      body += chunk;
+      if (Buffer.byteLength(body) > maxBytes) {
+        reject(Object.assign(new Error("request body too large"), { status: 413 }));
+        req.destroy();
+      }
+    });
+    req.on("end", () => {
+      try { resolve(JSON.parse(body || "{}")); }
+      catch { reject(Object.assign(new Error("invalid JSON"), { status: 400 })); }
+    });
+    req.on("error", reject);
+  });
+}
+
+function clearAdvisorCache() {
+  for (const key of cache.keys()) if (key.startsWith("advisor-")) cache.delete(key);
+}
+
+async function handleAdvisor(req, res, requestUrl) {
+  const days = rangeDays(requestUrl.searchParams.get("range"));
+  if (!days) { json(res, 400, { error: "range must be 7d, 30d, or 90d" }); return true; }
+
+  if (requestUrl.pathname === "/api/advisor" && req.method === "GET") {
+    const result = await advisorResponse(days, requestUrl.searchParams.get("fresh") === "1");
+    json(res, 200, publicAdvisor(result));
+    return true;
+  }
+  if (requestUrl.pathname === "/api/advisor/evidence" && req.method === "GET") {
+    const id = requestUrl.searchParams.get("id") || "";
+    const result = await advisorResponse(days, false);
+    if (!result.evidence[id]) json(res, 404, { error: "evidence not found" });
+    else json(res, 200, { id, evidence: result.evidence[id] });
+    return true;
+  }
+  if (requestUrl.pathname === "/api/advisor/settings" && req.method === "GET") {
+    json(res, 200, { subscriptions: advisorStore.readState().subscriptions });
+    return true;
+  }
+  const outcomeMatch = requestUrl.pathname.match(/^\/api\/advisor\/outcomes\/([a-z0-9-]{1,100})$/i);
+  const mutation = requestUrl.pathname === "/api/advisor/settings" || outcomeMatch;
+  if (mutation && ["PUT", "DELETE"].includes(req.method)) {
+    if (!validMutation(req)) { json(res, 403, { error: "same-origin action header required" }); return true; }
+    try {
+      const state = advisorStore.readState();
+      if (requestUrl.pathname === "/api/advisor/settings" && req.method === "PUT") {
+        const body = await readJsonBody(req);
+        if (Object.keys(body).some((key) => key !== "subscriptions")) throw new Error("settings contain unknown fields");
+        state.subscriptions = advisorStore.validateSubscriptions(body.subscriptions);
+      } else if (outcomeMatch && req.method === "PUT") {
+        state.outcomes[outcomeMatch[1]] = advisorStore.validateOutcome(await readJsonBody(req));
+      } else if (outcomeMatch && req.method === "DELETE") {
+        delete state.outcomes[outcomeMatch[1]];
+      } else { json(res, 405, { error: "method not allowed" }); return true; }
+      advisorStore.writeState(state);
+      clearAdvisorCache();
+      json(res, 200, outcomeMatch ? { outcome: state.outcomes[outcomeMatch[1]] || null } : { subscriptions: state.subscriptions });
+    } catch (error) {
+      json(res, error.status || 400, { error: String(error.message || error).slice(0, 200) });
+    }
+    return true;
+  }
+  if (requestUrl.pathname.startsWith("/api/advisor")) {
+    json(res, 405, { error: "method not allowed" });
+    return true;
+  }
+  return false;
 }
 
 function guard(component, fn) {
@@ -112,12 +240,20 @@ function writeHead(res, status, headers = {}) {
 
 function startServer(port = 7788) {
   const server = http.createServer(async (req, res) => {
+    const requestUrl = new URL(req.url || "/", "http://127.0.0.1");
+    if (requestUrl.pathname.startsWith("/api/advisor")) {
+      try { if (await handleAdvisor(req, res, requestUrl)) return; }
+      catch (e) {
+        logError("advisor", e, { version: VERSION });
+        json(res, 500, { error: "advisor failed; check the local error log" });
+        return;
+      }
+    }
     if (req.method !== "GET") {
       writeHead(res, 405, { Allow: "GET", "Content-Type": "text/plain; charset=utf-8" });
       res.end("method not allowed");
       return;
     }
-    const requestUrl = new URL(req.url || "/", "http://127.0.0.1");
     const route = ROUTES[requestUrl.pathname];
     if (route) {
       const fresh = requestUrl.searchParams.get("fresh") === "1";

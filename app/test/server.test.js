@@ -1,5 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const { startServer, _cache } = require("../server");
 
 test("server serves index.html and degrading API endpoints", async () => {
@@ -51,5 +54,48 @@ test("?fresh=1 busts the response cache", async () => {
   } finally {
     _cache.clear();
     server.close();
+  }
+});
+
+test("advisor settings and outcomes require same-origin explicit mutations", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lgz-advisor-http-"));
+  process.env.LLM_GROUND_ZERO_ADVISOR_PATH = path.join(dir, "advisor.json");
+  const server = await startServer(0);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const headers = {
+    Origin: base,
+    "Content-Type": "application/json",
+    "X-LLM-Ground-Zero-Action": "1",
+  };
+  try {
+    const badRange = await fetch(`${base}/api/advisor?range=14d`);
+    assert.strictEqual(badRange.status, 400);
+
+    const blocked = await fetch(`${base}/api/advisor/settings`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: "{}",
+    });
+    assert.strictEqual(blocked.status, 403);
+
+    const settings = await fetch(`${base}/api/advisor/settings`, {
+      method: "PUT", headers,
+      body: JSON.stringify({ subscriptions: [{ provider: "Example", plan: "Pro", monthlyPrice: 20, currency: "USD" }] }),
+    });
+    assert.strictEqual(settings.status, 200);
+    assert.strictEqual((await settings.json()).subscriptions[0].monthlyPrice, 20);
+
+    const outcome = await fetch(`${base}/api/advisor/outcomes/claude-abc123`, {
+      method: "PUT", headers,
+      body: JSON.stringify({ status: "paused", type: "prototype", note: "resume later" }),
+    });
+    assert.strictEqual(outcome.status, 200);
+    const stored = JSON.parse(fs.readFileSync(process.env.LLM_GROUND_ZERO_ADVISOR_PATH));
+    assert.strictEqual(stored.outcomes["claude-abc123"].status, "paused");
+    assert.strictEqual(fs.statSync(process.env.LLM_GROUND_ZERO_ADVISOR_PATH).mode & 0o777, 0o600);
+
+    const deleted = await fetch(`${base}/api/advisor/outcomes/claude-abc123`, { method: "DELETE", headers });
+    assert.strictEqual(deleted.status, 200);
+  } finally {
+    server.close();
+    delete process.env.LLM_GROUND_ZERO_ADVISOR_PATH;
   }
 });
