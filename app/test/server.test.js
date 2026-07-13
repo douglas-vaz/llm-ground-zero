@@ -10,6 +10,17 @@ test("server serves index.html and degrading API endpoints", async () => {
     const html = await fetch(base + "/").then((r) => r.text());
     assert.ok(html.includes("llm-"));
 
+    const indexResponse = await fetch(base + "/");
+    assert.ok(indexResponse.headers.get("content-security-policy").includes("default-src 'self'"));
+    assert.ok(!await indexResponse.text().then((body) => body.includes("cdn.jsdelivr.net")));
+
+    const chart = await fetch(base + "/vendor/chart.umd.js");
+    assert.strictEqual(chart.status, 200);
+    assert.ok(chart.headers.get("content-type").startsWith("text/javascript"));
+
+    const health = await fetch(base + "/api/health").then((r) => r.json());
+    assert.strictEqual(health.app, "llm-ground-zero");
+
     for (const ep of ["tools", "conversations", "memories"]) {
       const res = await fetch(`${base}/api/${ep}`);
       assert.strictEqual(res.headers.get("content-type"), "application/json");
@@ -20,6 +31,9 @@ test("server serves index.html and degrading API endpoints", async () => {
 
     const missing = await fetch(base + "/nope");
     assert.strictEqual(missing.status, 404);
+
+    const post = await fetch(base + "/api/memories", { method: "POST" });
+    assert.strictEqual(post.status, 405);
   } finally {
     server.close();
   }

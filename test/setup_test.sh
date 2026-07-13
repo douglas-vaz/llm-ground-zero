@@ -10,6 +10,23 @@ export HOME="$SANDBOX/home"
 mkdir -p "$HOME"
 export PATH="$REPO_DIR/test/stubs:$PATH"
 
+# Pre-existing config represents a clone that moved. Setup must converge to
+# the current data path without disturbing unrelated Codex configuration.
+mkdir -p "$HOME/.codex"
+cat > "$HOME/.codex/config.toml" <<'EOF'
+model = "gpt-test"
+
+[mcp_servers.engram]
+command = "old-engram"
+args = ["mcp"]
+
+[mcp_servers.engram.env]
+ENGRAM_DATA_DIR = "/old/clone/data"
+
+[features]
+example = true
+EOF
+
 FAILURES=0
 assert() { # assert <description> <command...>
   local desc="$1"; shift
@@ -34,6 +51,10 @@ assert "codex config.toml registers engram" \
   grep -q '^\[mcp_servers\.engram\]' "$HOME/.codex/config.toml"
 assert "codex config.toml sets ENGRAM_DATA_DIR" \
   grep -qF "$REPO_DIR/data" "$HOME/.codex/config.toml"
+assert "codex config.toml removes stale ENGRAM_DATA_DIR" \
+  sh -c "! grep -qF '/old/clone/data' '$HOME/.codex/config.toml'"
+assert "codex config.toml preserves unrelated settings" \
+  grep -q '^example = true' "$HOME/.codex/config.toml"
 assert "codex AGENTS.md points at shared AGENTS.md" \
   grep -qF "$REPO_DIR/agents/AGENTS.md" "$HOME/.codex/AGENTS.md"
 

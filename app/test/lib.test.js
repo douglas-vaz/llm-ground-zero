@@ -72,6 +72,12 @@ test("codexConversations reads meta and skips env context", () => {
       content: [{ type: "input_text",
                   text: "<environment_context>...</environment_context>" }] } },
     { type: "response_item", payload: { type: "message", role: "user",
+      content: [{ type: "input_text",
+                  text: "# AGENTS.md instructions\nRead shared instructions" }] } },
+    { type: "response_item", payload: { type: "message", role: "user",
+      content: [{ type: "input_text",
+                  text: "The following is the Codex agent history whose request action you are assessing." }] } },
+    { type: "response_item", payload: { type: "message", role: "user",
       content: [{ type: "input_text", text: "Build the brew scheduler" }] } },
   ]);
   const convs = lib.codexConversations(root, 10);

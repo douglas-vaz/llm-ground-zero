@@ -18,6 +18,14 @@
   (`?fresh=1` busts the 60s cache), and fixed a Chart.js canvas-reuse bug
   on re-render (mkChart destroys before recreating). App stays read-only —
   memory deletion was considered and explicitly rejected.
+- **Main after v0.1.2 is hardened**: Chart.js is bundled locally; the frontend
+  is split into HTML/CSS/JS, uses text-safe DOM rendering under a strict CSP,
+  and keeps panels independent with `Promise.allSettled`. Desktop/mobile card
+  layouts and accessibility were improved. Codex instruction/reviewer envelope
+  rows are filtered from conversation titles. Electron verifies an existing
+  server before attaching and explicitly enables sandboxed web preferences.
+- `setup.sh` now replaces stale Codex Engram blocks when the clone moves and
+  falls back to Node when Python is unavailable for Gemini configuration.
 - Core agent wiring unchanged: `setup.sh`, `agents/AGENTS.md`, Engram MCP.
 
 ## Recent decisions
@@ -29,6 +37,8 @@
   notarization + auto-update if the project gains traction.
 - Anonymous error log at `~/Library/Logs/llm-ground-zero/error.log`
   (sanitize() collapses $HOME → `~`; only error name/message/stack logged).
+- Local assets + CSP over runtime CDN loading — keeps the packaged dashboard
+  offline-capable and prevents session/memory text from becoming executable UI.
 
 ## Gotchas
 - ccusage's cli.js delegates at runtime to per-arch native binaries
@@ -42,6 +52,8 @@
   trusts only that cask instead of the whole tap.
 - GitHub handle is `douglas-vaz` (hyphen), not douglasvaz.
 - `node --test test/` fails on Node 22 — use bare `node --test`.
+- Current validation: `npm test` (13 tests), setup sandbox test, universal dmg
+  build, 1280px + 390px live browser checks, and `npm audit` all pass.
 - Older gotchas (claude mcp add arg order, engram save syntax, Codex env
   noise rows) still apply; see git history of this file.
 
@@ -49,6 +61,7 @@
 1. Optional: code signing + notarization ($99/yr) → removes xattr step.
 2. Graduate cask to homebrew/cask when notability criteria are met.
 3. User preferences section in agents/AGENTS.md still empty.
-4. Semantic search upgrade path unchanged (OpenMemory + Ollama specs).
+4. Cut the next app release and update the Homebrew cask for the hardening pass.
+5. Semantic search upgrade path unchanged (OpenMemory + Ollama specs).
 
-_Last updated: 2026-06-16_
+_Last updated: 2026-07-13_

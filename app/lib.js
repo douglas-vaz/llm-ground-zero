@@ -58,7 +58,13 @@ function firstText(content) {
 // (Codex gotcha: env context arrives wrapped as a user message starting "<".)
 function isNoise(text) {
   const t = text.trim();
-  return !t || t.startsWith("<") || t.startsWith("Caveat:");
+  return !t
+    || t.startsWith("<")
+    || t.startsWith("Caveat:")
+    || t.startsWith("# AGENTS.md instructions")
+    || t.startsWith("# CLAUDE.md instructions")
+    || t.startsWith("# GEMINI.md instructions")
+    || t.startsWith("The following is the Codex agent history");
 }
 
 function claudeConversations(projectsRoot, limit = 20) {

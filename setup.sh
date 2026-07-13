@@ -17,6 +17,33 @@ append_once() { # append_once <file> <line>
   grep -qxF "$2" "$1" 2>/dev/null || printf '\n%s\n' "$2" >> "$1"
 }
 
+remove_ground_zero_pointers() { # remove_ground_zero_pointers <file>
+  local file="$1" tmp
+  tmp="$(mktemp "${file}.tmp.XXXXXX")"
+  awk '!(/llm-ground-zero\/agents\/AGENTS\.md$/)' "$file" > "$tmp"
+  mv "$tmp" "$file"
+}
+
+upsert_codex_engram() { # replace our complete TOML block, preserving all others
+  local cfg="$1" tmp
+  tmp="$(mktemp "${cfg}.tmp.XXXXXX")"
+  awk '
+    /^\[mcp_servers\.engram(\.env)?\]$/ { skipping=1; next }
+    skipping && /^\[/ { skipping=0 }
+    !skipping { print }
+  ' "$cfg" > "$tmp"
+  cat >> "$tmp" <<EOF
+
+[mcp_servers.engram]
+command = "engram"
+args = ["mcp"]
+
+[mcp_servers.engram.env]
+ENGRAM_DATA_DIR = "$DATA_DIR"
+EOF
+  mv "$tmp" "$cfg"
+}
+
 install_engram() {
   if have engram; then return; fi
   if have brew; then
@@ -46,6 +73,7 @@ configure_claude() {
   claude mcp add --scope user engram --env ENGRAM_DATA_DIR="$DATA_DIR" -- engram mcp
   mkdir -p "$HOME/.claude"
   touch "$HOME/.claude/CLAUDE.md"
+  remove_ground_zero_pointers "$HOME/.claude/CLAUDE.md"
   append_once "$HOME/.claude/CLAUDE.md" "@$AGENTS_MD"
   CONFIGURED+=("Claude Code")
 }
@@ -57,18 +85,9 @@ configure_codex() {
   mkdir -p "$HOME/.codex"
   local cfg="$HOME/.codex/config.toml"
   touch "$cfg"
-  if ! grep -q '^\[mcp_servers\.engram\]' "$cfg"; then
-    cat >> "$cfg" <<EOF
-
-[mcp_servers.engram]
-command = "engram"
-args = ["mcp"]
-
-[mcp_servers.engram.env]
-ENGRAM_DATA_DIR = "$DATA_DIR"
-EOF
-  fi
+  upsert_codex_engram "$cfg"
   touch "$HOME/.codex/AGENTS.md"
+  remove_ground_zero_pointers "$HOME/.codex/AGENTS.md"
   append_once "$HOME/.codex/AGENTS.md" "$POINTER_LINE"
   CONFIGURED+=("Codex CLI")
 }
@@ -78,7 +97,8 @@ configure_gemini() {
     SKIPPED+=("Gemini CLI — not found"); return
   fi
   mkdir -p "$HOME/.gemini"
-  python3 - "$HOME/.gemini/settings.json" "$DATA_DIR" <<'PY'
+  if have python3; then
+    python3 - "$HOME/.gemini/settings.json" "$DATA_DIR" <<'PY'
 import json, os, sys
 path, data_dir = sys.argv[1], sys.argv[2]
 cfg = {}
@@ -94,7 +114,26 @@ with open(path, "w") as f:
     json.dump(cfg, f, indent=2)
     f.write("\n")
 PY
+  elif have node; then
+    node - "$HOME/.gemini/settings.json" "$DATA_DIR" <<'JS'
+const fs = require("node:fs");
+const [path, dataDir] = process.argv.slice(2);
+const cfg = fs.existsSync(path) && fs.statSync(path).size
+  ? JSON.parse(fs.readFileSync(path, "utf8")) : {};
+cfg.mcpServers ||= {};
+cfg.mcpServers.engram = {
+  command: "engram",
+  args: ["mcp"],
+  env: { ENGRAM_DATA_DIR: dataDir },
+};
+fs.writeFileSync(path, JSON.stringify(cfg, null, 2) + "\n");
+JS
+  else
+    SKIPPED+=("Gemini CLI — python3 or node is required to update settings.json")
+    return
+  fi
   touch "$HOME/.gemini/GEMINI.md"
+  remove_ground_zero_pointers "$HOME/.gemini/GEMINI.md"
   append_once "$HOME/.gemini/GEMINI.md" "$POINTER_LINE"
   CONFIGURED+=("Gemini CLI")
 }
