@@ -8,12 +8,13 @@
 - Version is bumped to v0.2.0 and the Electron package allowlist includes the
   advisor runtime modules.
 - Existing untracked `context/ai-central/` remains untouched.
-- Local `main` contains the unreleased v0.2.0 commits ahead of `origin/main`;
-  no push, tag, GitHub
-  release, Homebrew update, or installed-app replacement has been performed.
-- The currently published and Homebrew-installed app is still v0.1.3. Its
-  local assets, strict CSP, universal DMG workflow, and Electron sandboxing
-  predate this branch and remain intact.
+- v0.2.0 is published from tag `v0.2.0` at main commit `bd9037d`; GitHub Actions
+  run `29262846719` rebuilt, tested, checksummed, and published the universal
+  DMG successfully.
+- Homebrew tap commit `310b428` points to the CI-built DMG checksum
+  `749e2ac716f920ad9cdfdab61189fb7c7edaad796333d1aad58acd37dc6a9438`.
+- Homebrew-installed `/Applications/LLM Ground Zero.app` is v0.2.0, quarantine
+  is cleared, and the app is currently open after a successful smoke test.
 
 ## Implemented behavior
 
@@ -58,8 +59,10 @@
 
 ## Next steps
 
-1. Push `main` and tag v0.2.0 after explicit publishing approval.
-2. Publish the GitHub release and update the Homebrew cask checksum/version.
-3. Reinstall via Homebrew and verify the installed app reports v0.2.0.
+1. Monitor user feedback and sanitized runtime logs for advisor edge cases.
+2. Improve the offline state so a stopped server is distinguished from six
+   independent data-source failures.
+3. Address the GitHub Actions Node 20 deprecation annotation by upgrading
+   checkout/setup-node actions when stable versions are available.
 
 _Last updated: 2026-07-13_
