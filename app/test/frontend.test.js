@@ -23,6 +23,8 @@ test("frontend uses local assets and safe DOM rendering", () => {
   assert.ok(html.includes('id="headroomMonitorStatus"'));
   assert.ok(js.includes('/api/headroom/install'));
   assert.ok(js.includes('setInterval(monitorHeadroom, 15000)'));
+  assert.ok(js.includes('byId("subscriptionRows").replaceChildren(...rows)'));
+  assert.ok(!js.includes("rows.length ? rows : [subscriptionRow()]"));
   assert.ok(js.includes('"X-LLM-Ground-Zero-Action": "1"'));
   assert.ok(js.includes("navigator.clipboard.writeText"));
   assert.ok(!html.includes("onclick="));

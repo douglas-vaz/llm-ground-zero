@@ -714,7 +714,7 @@ async function openSettings() {
     const [plansResponse, headroomResponse] = await Promise.all([fetch("/api/advisor/settings"), fetch("/api/headroom/status?fresh=1")]);
     const data = await plansResponse.json(); headroomSettings = await headroomResponse.json();
     const rows = (data.subscriptions || []).map(subscriptionRow);
-    byId("subscriptionRows").replaceChildren(...(rows.length ? rows : [subscriptionRow()]));
+    byId("subscriptionRows").replaceChildren(...rows);
     updateHeadroomStatus(headroomSettings, true);
   } catch {
     byId("settingsState").textContent = "Could not load plan settings.";
