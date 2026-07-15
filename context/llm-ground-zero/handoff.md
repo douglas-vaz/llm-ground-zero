@@ -2,29 +2,23 @@
 
 ## Current state
 
-- Working branch: `codex/headroom-ui-install`, based on released `main`.
+- Working branch: `main`; the in-app Headroom installer/status increment is released.
 - The approved AI Usage Advisor spec, implementation checklist, analysis
   engine, secured local API, and responsive five-view dashboard are implemented.
-- Version is bumped to v0.3.0 and the Electron package allowlist includes the
+- Version is v0.3.1 and the Electron package allowlist includes the
   advisor and Headroom integration runtime modules.
 - Existing untracked `context/ai-central/` remains untouched.
-- v0.2.0 is published from tag `v0.2.0` at main commit `bd9037d`; GitHub Actions
-  run `29262846719` rebuilt, tested, checksummed, and published the universal
+- v0.3.1 is published from tag `v0.3.1` at main commit `164034a`; GitHub Actions
+  run `29418238356` rebuilt, tested, checksummed, and published the universal
   DMG successfully.
-- Homebrew tap commit `310b428` points to the CI-built DMG checksum
-  `749e2ac716f920ad9cdfdab61189fb7c7edaad796333d1aad58acd37dc6a9438`.
-- v0.3.0 is published from tag `v0.3.0` at main commit `94ac47d`; GitHub Actions
-  run `29416498008` rebuilt, tested, checksummed, and published the universal
-  DMG successfully.
-- Homebrew tap commit `4fc02a4` points to the CI-built DMG checksum
-  `6d28118ccaa9d8e21d7744db017eba58f8d77522300cc3a3d423113835491fe7`.
-- Homebrew-installed `/Applications/LLM Ground Zero.app` is v0.3.0, quarantine
+- Homebrew tap commit `5b4dd19` points to the CI-built DMG checksum
+  `9c63bcc57e1b9f59d6b089b4667c77c8e61f994c4b06604ad8ddb060d898de1d`.
+- Homebrew-installed `/Applications/LLM Ground Zero.app` is v0.3.1, quarantine
   is cleared, and the app is open after a successful smoke test on port 7788.
 - The optional Headroom integration, design record, checklist, sanitized
   screenshot, setup path, local API, Settings controls, and Token savings view
   are implemented. Headroom remains disabled by default.
-- In-app Headroom install/upgrade and 15-second status monitoring are now
-  implemented on the working branch but not yet released.
+- In-app Headroom install/upgrade and 15-second status monitoring are released.
 
 ## Implemented behavior
 
@@ -49,26 +43,24 @@
 
 ## Verification
 
-- Full Node suite: 26 passing, including package inclusion, Headroom aggregation,
+- Full Node suite: 27 passing, including package inclusion, Headroom aggregation,
   ranged API behavior, mutation security, and oversized-body handling.
 - Shell setup suite passes 16 checks, including opt-in-only behavior, pinned
   Python 3.13 installation, target allowlisting, and Gemini rejection.
 - Browser smoke test: live advisor, navigation, settings dialog, all four legacy
   charts, 560 px and 320 px layouts, no horizontal overflow or console errors.
 - JavaScript syntax checks and `git diff --check` pass.
-- Universal v0.3.0 DMG builds successfully; the app contains x86_64 and arm64,
+- Universal v0.3.1 DMG builds successfully; the app contains x86_64 and arm64,
   `integrations/headroom.js` is present in ASAR, and the current local checksum
   is recorded during packaging verification.
-- Browser verification used the live server plus sanitized fixtures; the
-  30-day savings view renders at desktop size with no console-reported failure.
-- The installed bundle reports v0.3.0, contains x86_64 and arm64, includes the
+- The installed bundle reports v0.3.1, contains x86_64 and arm64, includes the
   Headroom adapter in ASAR, and returns healthy `/api/health` output.
-- The machine now exposes Headroom v0.31.0 with no selected targets; browser
-  verification reports Ready and no agent provider config was changed.
 - Updated Node suite: 27 passing, including the pinned in-app installer command,
   rejection of client-supplied arguments, and status-monitor frontend contract.
 - Browser verification shows a compatible Ready state in Settings and the live
   Token savings status badge; no agent target was enabled during verification.
+- Installed-app verification reports Headroom v0.31.0 as compatible, with no
+  selected targets; installer mutation guards return 403/400 as expected.
 
 ## Recent decisions
 
@@ -101,11 +93,10 @@
 
 ## Next steps
 
-1. Review, commit, and release the in-app installer/status-monitor increment.
-2. Monitor user feedback and sanitized runtime logs for advisor/Headroom edge cases.
-3. Improve the offline state so a stopped server is distinguished from seven
+1. Monitor user feedback and sanitized runtime logs for advisor/Headroom edge cases.
+2. Improve the offline state so a stopped server is distinguished from seven
    independent data-source failures.
-4. Address the GitHub Actions Node 20 deprecation annotation by upgrading
+3. Address the GitHub Actions Node 20 deprecation annotation by upgrading
    checkout/setup-node actions when stable versions are available.
 
 _Last updated: 2026-07-15_
