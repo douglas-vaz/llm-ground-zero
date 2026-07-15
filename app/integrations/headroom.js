@@ -317,6 +317,7 @@ async function rollback(binary) {
 }
 
 async function reconcileNow(input) {
+  if (fixture()) throw new Error("This instance is showing demo fixture data; Headroom settings are read-only here.");
   const settings = validateSettings(input); preflight(settings);
   const found = await locate();
   if (!found.binary || !found.compatible) throw new Error(`Headroom ${MIN_VERSION} or newer is not installed. Use Install Headroom in Settings first.`);

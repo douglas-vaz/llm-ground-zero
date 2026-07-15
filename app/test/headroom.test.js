@@ -245,3 +245,10 @@ test("fixture status gains a derived state", async () => {
     assert.strictEqual(result.state, "active");
   });
 });
+
+test("reconcile refuses clearly while fixture data is active", async () => {
+  await withHeadroomEnv({ LLM_GROUND_ZERO_HEADROOM_FIXTURE: path.join(__dirname, "fixtures", "headroom", "dashboard.json") }, async () => {
+    await assert.rejects(() => headroom.reconcile({ targets: ["claude"], mode: "cache" }),
+      /demo fixture data.*read-only/);
+  });
+});
