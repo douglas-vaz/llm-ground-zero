@@ -5,7 +5,7 @@
 - Working branch: `main`; the in-app Headroom installer/status increment is released.
 - The approved AI Usage Advisor spec, implementation checklist, analysis
   engine, secured local API, and responsive five-view dashboard are implemented.
-- Version is v0.3.1 and the Electron package allowlist includes the
+- Version is v0.3.2 and the Electron package allowlist includes the
   advisor and Headroom integration runtime modules.
 - Existing untracked `context/ai-central/` remains untouched.
 - v0.3.1 is published from tag `v0.3.1` at main commit `164034a`; GitHub Actions
@@ -15,6 +15,11 @@
   `9c63bcc57e1b9f59d6b089b4667c77c8e61f994c4b06604ad8ddb060d898de1d`.
 - Homebrew-installed `/Applications/LLM Ground Zero.app` is v0.3.1, quarantine
   is cleared, and the app is open after a successful smoke test on port 7788.
+- v0.3.2 is published from tag `v0.3.2` at main commit `5225e07`; GitHub Actions
+  run `29420929494` published the universal DMG with checksum
+  `62ed5671a88efde47b339e50fb8ec2e34834fc1550ec92139a9c6947235206df`.
+- The Homebrew tap and local app remain on v0.3.1; they were not part of the
+  v0.3.2 fix/package request.
 - The optional Headroom integration, design record, checklist, sanitized
   screenshot, setup path, local API, Settings controls, and Token savings view
   are implemented. Headroom remains disabled by default.
@@ -61,6 +66,8 @@
   Token savings status badge; no agent target was enabled during verification.
 - Installed-app verification reports Headroom v0.31.0 as compatible, with no
   selected targets; installer mutation guards return 403/400 as expected.
+- v0.3.2 removes the synthetic blank subscription row, so optional plan fields
+  no longer block saving Headroom settings; the frontend contract test covers it.
 
 ## Recent decisions
 
