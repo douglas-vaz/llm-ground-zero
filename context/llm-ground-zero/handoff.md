@@ -92,8 +92,21 @@
   Code and Codex targets; Gemini stays visibly unsupported until upstream adds
   a supported CLI installer target.
 - Delegate configuration to Headroom v0.31.0's reversible persistent installer
-  using provider scope, profile `llm-ground-zero`, port 8791, and an isolated
-  app-owned `HEADROOM_WORKSPACE_DIR`; do not recreate upstream config writers.
+  using provider scope, profile `llm-ground-zero`, port 8791; do not recreate
+  upstream config writers.
+- REVERSED (2026-07-16): the isolated app-owned `HEADROOM_WORKSPACE_DIR` does
+  not work — the launchd service plist carries no environment, so
+  `install agent run` cannot find the profile and every apply fails with
+  "Deployment did not become ready after start". Both the app and setup.sh now
+  use Headroom's default `~/.headroom` workspace; isolation comes from the
+  profile name.
+- Upstream v0.31.0 bug found live: the codex writer appends
+  `model_provider = "headroom"` at the end of `~/.codex/config.toml`, inside
+  whatever TOML table is open there (here `[mcp_servers.engram.env]`), so
+  codex is silently not routed. Fixed manually by moving the whole marked
+  Headroom block (markers intact for `install remove`) into the root section;
+  backup at `~/.codex/config.toml.bak-headroom`. The app's routing-drift
+  warning correctly detects this; `headroom doctor` does not (grep-level check).
 - Keep Engram authoritative and leave Headroom memory, learn, output shaping,
   and anonymous telemetry off in the first release.
 - Report measured proxy before/after tokens separately from CLI filtering,
@@ -108,17 +121,34 @@
 - On Node 22, run the test suite as bare `node --test` (the npm script already
   does this), not `node --test test/`.
 
+## Live machine state (2026-07-16)
+
+- `/Applications/LLM Ground Zero.app` is a local unsigned build of the branch
+  (v0.3.2 + headroom hardening), installed over the Homebrew copy via ditto.
+  The Homebrew tap still points at the release v0.3.1 DMG.
+- Headroom is ACTIVE: profile `llm-ground-zero` in `~/.headroom`, proxy
+  healthy on 8791, targets claude+codex, cache mode. Claude Code routes via
+  `env.ANTHROPIC_BASE_URL` in `~/.claude/settings.json`; codex via the
+  relocated provider block in `~/.codex/config.toml`. Verified end to end
+  (one proxied Claude Code request recorded).
+- Disable path: untick agents in app Settings and Apply, or
+  `headroom install remove --profile llm-ground-zero`.
+
 ## Next steps
 
 1. Merge branch `claude/headroom-integration-improvements-e67e17` (headroom
    setup robustness: rollback, health verification, drift detection, state
-   UI). Suite is 35 passing there; it also fixes a latent `sanitize`
-   ReferenceError in `server.js`'s guard() error path.
-2. Monitor user feedback and sanitized runtime logs for advisor/Headroom edge cases.
-3. Improve the offline state so a stopped server is distinguished from seven
+   UI, default-workspace fix, hidden-button CSS fix, fixture-mode guard; also
+   fixes a latent `sanitize` ReferenceError in `server.js` guard()). Suite:
+   36 node tests + 16 shell checks passing.
+2. Report the two upstream Headroom v0.31.0 issues: launchd service ignores
+   `HEADROOM_WORKSPACE_DIR`, and the codex config writer appends into an open
+   TOML table.
+3. Monitor user feedback and sanitized runtime logs for advisor/Headroom edge cases.
+4. Improve the offline state so a stopped server is distinguished from seven
    independent data-source failures (the Headroom pill now handles its own
    unavailable state; the other panels still do not).
-4. Address the GitHub Actions Node 20 deprecation annotation by upgrading
+5. Address the GitHub Actions Node 20 deprecation annotation by upgrading
    checkout/setup-node actions when stable versions are available.
 
-_Last updated: 2026-07-15_
+_Last updated: 2026-07-16_
