@@ -2,7 +2,7 @@
 
 ## Current state
 
-- Working branch: `codex/headroom-integration`, based on `main` at `cdf8d55`.
+- Working branch: `main`; `codex/headroom-integration` was fast-forward merged.
 - The approved AI Usage Advisor spec, implementation checklist, analysis
   engine, secured local API, and responsive five-view dashboard are implemented.
 - Version is bumped to v0.3.0 and the Electron package allowlist includes the
@@ -13,8 +13,13 @@
   DMG successfully.
 - Homebrew tap commit `310b428` points to the CI-built DMG checksum
   `749e2ac716f920ad9cdfdab61189fb7c7edaad796333d1aad58acd37dc6a9438`.
-- Homebrew-installed `/Applications/LLM Ground Zero.app` is still v0.2.0 and
-  owns port 7788; v0.3.0 publication, tap update, and local upgrade are next.
+- v0.3.0 is published from tag `v0.3.0` at main commit `94ac47d`; GitHub Actions
+  run `29416498008` rebuilt, tested, checksummed, and published the universal
+  DMG successfully.
+- Homebrew tap commit `4fc02a4` points to the CI-built DMG checksum
+  `6d28118ccaa9d8e21d7744db017eba58f8d77522300cc3a3d423113835491fe7`.
+- Homebrew-installed `/Applications/LLM Ground Zero.app` is v0.3.0, quarantine
+  is cleared, and the app is open after a successful smoke test on port 7788.
 - The optional Headroom integration, design record, checklist, sanitized
   screenshot, setup path, local API, Settings controls, and Token savings view
   are implemented. Headroom remains disabled by default.
@@ -51,6 +56,10 @@
   is recorded during packaging verification.
 - Browser verification used the live server plus sanitized fixtures; the
   30-day savings view renders at desktop size with no console-reported failure.
+- The installed bundle reports v0.3.0, contains x86_64 and arm64, includes the
+  Headroom adapter in ASAR, and returns healthy `/api/health` output.
+- The machine's pre-existing Headroom v0.28.0 is correctly reported as
+  incompatible with no selected targets; no agent provider config was changed.
 
 ## Recent decisions
 
@@ -83,13 +92,12 @@
 
 ## Next steps
 
-1. Commit and fast-forward the Headroom branch to main, push, and tag v0.3.0.
-2. Wait for the tag workflow and use the CI-built DMG checksum in homebrew-tap.
-3. Upgrade the local cask, clear quarantine, and verify the installed app/API.
-4. Monitor user feedback and sanitized runtime logs for advisor/Headroom edge cases.
-5. Improve the offline state so a stopped server is distinguished from seven
+1. Optionally run `./setup.sh --headroom claude,codex --headroom-mode cache`
+   when the user chooses to upgrade Headroom and enable selected agent routes.
+2. Monitor user feedback and sanitized runtime logs for advisor/Headroom edge cases.
+3. Improve the offline state so a stopped server is distinguished from seven
    independent data-source failures.
-6. Address the GitHub Actions Node 20 deprecation annotation by upgrading
+4. Address the GitHub Actions Node 20 deprecation annotation by upgrading
    checkout/setup-node actions when stable versions are available.
 
 _Last updated: 2026-07-15_
