@@ -9,8 +9,17 @@ let lastEvidence = null;
 let headroomSettings = null;
 let headroomMonitorInFlight = false;
 // True while an install/apply/repair is running; blocks the 15s monitor from
-// overwriting in-progress feedback with a stale status snapshot.
+// overwriting in-progress feedback with a stale status snapshot. The epoch
+// invalidates monitor responses that were already in flight when an
+// operation started or finished — their snapshots may predate the outcome.
 let headroomBusy = false;
+let headroomOpEpoch = 0;
+let headroomWarningText = "";
+
+function setHeadroomBusy(value) {
+  headroomBusy = value;
+  headroomOpEpoch += 1;
+}
 
 if (typeof Chart !== "undefined") {
   Chart.defaults.color = "#9da7b3";
@@ -537,10 +546,18 @@ function updateHeadroomStatus(status = {}, syncSelections = false) {
   const repair = byId("headroomRepair");
   repair.hidden = !(usable && status.targets?.length && (state === "proxy-stopped" || state === "attention"));
   repair.textContent = status.healthy ? "Repair routing" : "Restart proxy";
+  // Auto-written warnings are cleared once they resolve, but text written by
+  // an action (progress, errors) is never cleared from here.
+  const stateLine = byId("headroomSettingsState");
   if (!usable && !status.installerAvailable) {
-    byId("headroomSettingsState").textContent = "uv is required. Install it with Homebrew, then reopen Settings.";
+    stateLine.textContent = "uv is required. Install it with Homebrew, then reopen Settings.";
+    headroomWarningText = stateLine.textContent;
   } else if (status.warnings?.length) {
-    byId("headroomSettingsState").textContent = status.warnings.join(" ");
+    stateLine.textContent = status.warnings.join(" ");
+    headroomWarningText = stateLine.textContent;
+  } else if (headroomWarningText && stateLine.textContent === headroomWarningText) {
+    stateLine.textContent = "";
+    headroomWarningText = "";
   }
 }
 
@@ -805,7 +822,7 @@ byId("clearOutcome").addEventListener("click", async () => {
 byId("addSubscription").addEventListener("click", () => byId("subscriptionRows").append(subscriptionRow()));
 byId("headroomInstall").addEventListener("click", async () => {
   const button = byId("headroomInstall");
-  headroomBusy = true;
+  setHeadroomBusy(true);
   button.disabled = true;
   button.textContent = headroomSettings?.installed ? "Upgrading…" : "Installing…";
   byId("headroomLiveStatus").textContent = headroomSettings?.installed ? "Upgrading…" : "Installing…";
@@ -814,10 +831,10 @@ byId("headroomInstall").addEventListener("click", async () => {
     const status = await mutate("/api/headroom/install", "POST", {});
     updateHeadroomStatus(status, true);
     byId("headroomSettingsState").textContent = `Headroom v${status.version} is ready. Choose agents, then Apply settings.`;
-    headroomBusy = false;
+    setHeadroomBusy(false);
     await load(true);
   } catch (error) {
-    headroomBusy = false;
+    setHeadroomBusy(false);
     byId("headroomSettingsState").textContent = error.message;
     if (headroomSettings) updateHeadroomStatus(headroomSettings, false);
     button.disabled = !headroomSettings?.installerAvailable;
@@ -829,18 +846,18 @@ byId("headroomRepair").addEventListener("click", async () => {
   const button = byId("headroomRepair");
   const current = headroomSettings;
   if (!current?.targets?.length) return;
-  headroomBusy = true;
+  setHeadroomBusy(true);
   button.disabled = true;
   const label = button.textContent;
   button.textContent = "Repairing…";
   byId("headroomMonitorStatus").textContent = "Repairing…";
   try {
     const status = await mutate("/api/headroom/settings", "PUT", { targets: current.targets, mode: current.mode || "cache" });
-    headroomBusy = false;
+    setHeadroomBusy(false);
     updateHeadroomStatus(status, false);
     await load(true);
   } catch (error) {
-    headroomBusy = false;
+    setHeadroomBusy(false);
     setPanelState("savingsState", error.message, true);
     if (headroomSettings) updateHeadroomStatus(headroomSettings, false);
   } finally {
@@ -866,12 +883,12 @@ byId("settingsForm").addEventListener("submit", async (event) => {
     if (byId("headroomCodex").checked) targets.push("codex");
     if (headroomSettings?.installed && headroomSettings.compatible) {
       phase = "headroom";
-      headroomBusy = true;
+      setHeadroomBusy(true);
       byId("headroomSettingsState").textContent = targets.length
         ? "Applying the Headroom agent setup — this can take up to two minutes…"
         : "Disabling Headroom and restoring native agent configuration…";
       const status = await mutate("/api/headroom/settings", "PUT", { targets, mode: byId("headroomMode").value });
-      headroomBusy = false;
+      setHeadroomBusy(false);
       updateHeadroomStatus(status, true);
       byId("headroomSettingsState").textContent = "";
       phase = "plans";
@@ -880,7 +897,7 @@ byId("settingsForm").addEventListener("submit", async (event) => {
     closeDialog("settingsDialog");
     await load(true);
   } catch (error) {
-    headroomBusy = false;
+    setHeadroomBusy(false);
     if (phase === "headroom") {
       byId("headroomSettingsState").textContent = error.message;
       byId("settingsState").textContent = "Headroom changes failed; plan settings were not saved.";
@@ -898,13 +915,15 @@ byId("range").addEventListener("change", () => load(true));
 async function monitorHeadroom() {
   if (headroomMonitorInFlight || headroomBusy) return;
   headroomMonitorInFlight = true;
+  const epoch = headroomOpEpoch;
+  const current = () => epoch === headroomOpEpoch && !headroomBusy;
   try {
     const response = await fetch("/api/headroom/status?fresh=1");
     if (!response.ok) throw new Error("status unavailable");
     const status = await response.json();
-    if (!headroomBusy) updateHeadroomStatus(status, false);
+    if (current()) updateHeadroomStatus(status, false);
   } catch {
-    if (!headroomBusy) {
+    if (current()) {
       const pill = byId("headroomMonitorStatus");
       pill.textContent = "Status unavailable";
       pill.className = "status-pill err";

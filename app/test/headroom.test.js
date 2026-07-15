@@ -126,6 +126,7 @@ test("installs the pinned Headroom CLI with uv without enabling agents", async (
   fs.chmodSync(fakeHeadroom, 0o755); fs.chmodSync(fakeUv, 0o755);
   process.env.LLM_GROUND_ZERO_HEADROOM_BIN = fakeHeadroom;
   process.env.LLM_GROUND_ZERO_UV_BIN = fakeUv;
+  process.env.LLM_GROUND_ZERO_HEADROOM_WORKSPACE = path.join(dir, "workspace");
   process.env.FAKE_HEADROOM_VERSION = versionFile;
   process.env.FAKE_UV_INVOCATION = invocationFile;
   try {
@@ -135,7 +136,7 @@ test("installs the pinned Headroom CLI with uv without enabling agents", async (
     assert.deepStrictEqual(result.targets, []);
     assert.strictEqual(fs.readFileSync(invocationFile, "utf8").trim(), "tool install --force --python 3.13 headroom-ai[proxy]==0.31.0");
   } finally {
-    for (const key of ["LLM_GROUND_ZERO_HEADROOM_BIN", "LLM_GROUND_ZERO_UV_BIN", "FAKE_HEADROOM_VERSION", "FAKE_UV_INVOCATION"]) delete process.env[key];
+    for (const key of ["LLM_GROUND_ZERO_HEADROOM_BIN", "LLM_GROUND_ZERO_UV_BIN", "LLM_GROUND_ZERO_HEADROOM_WORKSPACE", "FAKE_HEADROOM_VERSION", "FAKE_UV_INVOCATION"]) delete process.env[key];
   }
 });
 

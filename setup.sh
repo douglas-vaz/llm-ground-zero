@@ -14,7 +14,9 @@ HEADROOM_TARGETS=""
 HEADROOM_MODE="cache"
 HEADROOM_VERSION="0.31.0"
 HEADROOM_PORT="8791"
-HEADROOM_WORKSPACE="$HOME/Library/Application Support/LLM Ground Zero/headroom"
+# Headroom default workspace: the launchd service runs without
+# HEADROOM_WORKSPACE_DIR, so a custom workspace breaks persistent-service.
+HEADROOM_WORKSPACE="${HEADROOM_WORKSPACE_DIR:-$HOME/.headroom}"
 
 usage() {
   echo "Usage: ./setup.sh [--headroom claude,codex] [--headroom-mode cache|token]"

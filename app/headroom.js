@@ -11,13 +11,9 @@ const PORT = 8791;
 const TARGETS = new Set(["claude", "codex"]);
 const MODES = new Set(["cache", "token"]);
 
-// Headroom's own default workspace. The persistent-service launchd job runs
-// without HEADROOM_WORKSPACE_DIR in its environment, so a custom workspace
-// breaks `install agent run` (the service cannot find the profile and the
-// deployment never becomes ready). Isolation comes from the profile name.
 function workspaceDir() {
   return process.env.LLM_GROUND_ZERO_HEADROOM_WORKSPACE
-    || path.join(os.homedir(), ".headroom");
+    || path.join(os.homedir(), "Library", "Application Support", "LLM Ground Zero", "headroom");
 }
 
 function proxyPort() {
