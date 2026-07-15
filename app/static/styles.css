@@ -195,6 +195,9 @@ canvas { max-height: 260px; }
 .ledger-title { font-weight: 650; overflow-wrap: anywhere; }
 .ledger-meta, .usage-meta { color: var(--dim); font-size: 11px; margin-top: 3px; }
 .status-pill.manual { border-color: var(--accent); color: var(--accent); }
+.status-pill.ok { border-color: color-mix(in srgb, var(--green) 55%, var(--border)); color: var(--green); }
+.status-pill.warn { border-color: color-mix(in srgb, var(--orange) 55%, var(--border)); color: var(--orange); }
+.status-pill.err { border-color: color-mix(in srgb, var(--red) 55%, var(--border)); color: var(--red); }
 
 dialog {
   background: var(--panel);

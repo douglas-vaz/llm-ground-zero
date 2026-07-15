@@ -8,7 +8,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { execFile } = require("node:child_process");
 const lib = require("./lib");
-const { logError } = require("./log");
+const { logError, sanitize } = require("./log");
 const advisor = require("./advisor");
 const advisorParsers = require("./advisor/parsers");
 const advisorUsage = require("./advisor/usage");
@@ -180,7 +180,7 @@ async function handleHeadroom(req, res, requestUrl) {
       const result = await headroom.installCli();
       for (const key of cache.keys()) if (key.startsWith("headroom")) cache.delete(key);
       json(res, 200, result);
-    } catch (error) { json(res, error.status || 400, { error: String(error.message || error).slice(0, 300) }); }
+    } catch (error) { json(res, error.status || 400, { error: sanitize(error.message || String(error)).slice(0, 300) }); }
     return true;
   }
   if (requestUrl.pathname === "/api/headroom/settings" && req.method === "PUT") {
@@ -189,7 +189,7 @@ async function handleHeadroom(req, res, requestUrl) {
       const result = await headroom.reconcile(await readJsonBody(req));
       for (const key of cache.keys()) if (key.startsWith("headroom")) cache.delete(key);
       json(res, 200, result);
-    } catch (error) { json(res, error.status || 400, { error: String(error.message || error).slice(0, 300) }); }
+    } catch (error) { json(res, error.status || 400, { error: sanitize(error.message || String(error)).slice(0, 300) }); }
     return true;
   }
   if (requestUrl.pathname.startsWith("/api/headroom")) {

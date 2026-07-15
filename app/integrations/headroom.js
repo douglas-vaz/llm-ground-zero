@@ -16,6 +16,11 @@ function workspaceDir() {
     || path.join(os.homedir(), "Library", "Application Support", "LLM Ground Zero", "headroom");
 }
 
+function proxyPort() {
+  const value = Number(process.env.LLM_GROUND_ZERO_HEADROOM_PORT);
+  return Number.isInteger(value) && value > 0 ? value : PORT;
+}
+
 function fixture() {
   const file = process.env.LLM_GROUND_ZERO_HEADROOM_FIXTURE;
   if (!file) return null;
@@ -99,7 +104,7 @@ function readManifest() {
     return {
       targets: Array.isArray(value.targets) ? value.targets.filter((item) => TARGETS.has(item)) : [],
       mode: MODES.has(value.proxy_mode) ? value.proxy_mode : "cache",
-      port: Number(value.port) || PORT,
+      port: Number(value.port) || proxyPort(),
     };
   } catch { return null; }
 }
@@ -108,39 +113,108 @@ async function proxyJson(route, timeout = 2500) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   try {
-    const response = await fetch(`http://127.0.0.1:${PORT}${route}`, { signal: controller.signal });
+    const response = await fetch(`http://127.0.0.1:${proxyPort()}${route}`, { signal: controller.signal });
     if (!response.ok) throw new Error(`Headroom returned HTTP ${response.status}`);
     return await response.json();
   } finally { clearTimeout(timer); }
 }
 
+async function proxyHealthy() {
+  try { return (await proxyJson("/health")).status === "healthy"; } catch { return false; }
+}
+
+// Bounded wait for the persistent proxy to come up after `install apply`.
+async function waitForHealthy() {
+  const budget = Number(process.env.LLM_GROUND_ZERO_HEADROOM_HEALTH_WAIT_MS ?? 12_000);
+  const deadline = Date.now() + Math.max(0, budget);
+  for (;;) {
+    if (await proxyHealthy()) return true;
+    if (Date.now() >= deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, Math.min(1000, Math.max(50, budget / 10))));
+  }
+}
+
+// Detect drift: an agent is enabled in the manifest but its config no longer
+// routes through the proxy (e.g. the user hand-edited it or another tool
+// rewrote it). Reapplying the same settings repairs this.
+function routingDrift(targets) {
+  const drift = [];
+  if (targets.includes("claude")) {
+    let routed = false;
+    try {
+      const value = JSON.parse(fs.readFileSync(path.join(os.homedir(), ".claude", "settings.json"), "utf8"));
+      routed = String(value?.env?.ANTHROPIC_BASE_URL || "").includes(`127.0.0.1:${proxyPort()}`);
+    } catch { /* unreadable counts as not routed */ }
+    if (!routed) drift.push("Claude Code is enabled but no longer routes through Headroom.");
+  }
+  if (targets.includes("codex")) {
+    let routed = false;
+    try {
+      const value = fs.readFileSync(path.join(os.homedir(), ".codex", "config.toml"), "utf8");
+      const root = value.split(/^\s*\[/m, 1)[0];
+      routed = root.match(/^\s*model_provider\s*=\s*["']([^"']+)["']/m)?.[1] === "headroom";
+    } catch { /* unreadable counts as not routed */ }
+    if (!routed) drift.push("Codex is enabled but no longer routes through Headroom.");
+  }
+  return drift;
+}
+
+// Single source of truth for the integration state shown in the UI.
+function deriveState(value) {
+  if (!value.installed) return "not-installed";
+  if (!value.compatible) return "upgrade-required";
+  if (!value.targets?.length) return "ready";
+  if (!value.healthy) return "proxy-stopped";
+  if (value.warnings?.length) return "attention";
+  return "active";
+}
+
 async function status() {
   const data = fixture();
-  if (data?.status) return { installerAvailable: true, minimumVersion: MIN_VERSION, ...data.status };
+  if (data?.status) {
+    const value = { installerAvailable: true, minimumVersion: MIN_VERSION, ...data.status };
+    value.state = value.state || deriveState(value);
+    return value;
+  }
   const found = await locate();
   const uv = await locateUv();
-  if (!found.binary) return { installed: false, compatible: false, version: null, healthy: false, targets: [], mode: "cache", warnings: [], installerAvailable: Boolean(uv.binary), minimumVersion: MIN_VERSION };
+  if (!found.binary) {
+    const value = { installed: false, compatible: false, version: null, healthy: false, targets: [], mode: "cache", warnings: [], installerAvailable: Boolean(uv.binary), minimumVersion: MIN_VERSION };
+    return { ...value, state: deriveState(value) };
+  }
   const manifest = readManifest();
-  let healthy = false;
-  try { healthy = (await proxyJson("/health")).status === "healthy"; } catch { /* stopped */ }
+  const healthy = await proxyHealthy();
   const warnings = [];
   if (!found.compatible) warnings.push(`Headroom ${MIN_VERSION} or newer is required.`);
-  if (manifest && manifest.port !== PORT) warnings.push("The managed profile uses an unexpected port.");
-  return {
+  if (manifest && manifest.port !== proxyPort()) warnings.push("The managed profile uses an unexpected port.");
+  if (found.compatible && manifest?.targets?.length) warnings.push(...routingDrift(manifest.targets));
+  const value = {
     installed: true, compatible: found.compatible, version: found.version, healthy,
     targets: manifest?.targets || [], mode: manifest?.mode || "cache", warnings,
     installerAvailable: Boolean(uv.binary), minimumVersion: MIN_VERSION,
   };
+  return { ...value, state: deriveState(value) };
+}
+
+// Append the last stderr line so failures are actionable in the UI. Paths
+// are sanitized by the caller before display or logging.
+function withDetail(message, error) {
+  const detail = String(error?.stderr || "").trim().split("\n").filter(Boolean).at(-1) || "";
+  return detail ? `${message} (${detail.slice(0, 160)})` : message;
 }
 
 async function installCliNow() {
   if (fixture()) throw new Error("Headroom installation is unavailable while fixture data is active.");
   const uv = await locateUv();
   if (!uv.binary) throw new Error("uv is required to install Headroom. Install uv with Homebrew, then try again.");
-  await run(uv.binary, ["tool", "install", "--force", "--python", "3.13", `headroom-ai[proxy]==${MIN_VERSION}`], {
-    timeout: 10 * 60_000,
-    maxBuffer: 4 * 1024 * 1024,
-  });
+  try {
+    await run(uv.binary, ["tool", "install", "--force", "--python", "3.13", `headroom-ai[proxy]==${MIN_VERSION}`], {
+      timeout: 10 * 60_000,
+      maxBuffer: 4 * 1024 * 1024,
+    });
+  } catch (error) {
+    throw new Error(withDetail("Headroom installation failed; agent routing was not changed.", error));
+  }
   const found = await locate();
   if (!found.binary || !found.compatible) throw new Error(`Headroom ${MIN_VERSION} was installed but could not be verified. Restart the app and try again.`);
   return status();
@@ -217,7 +291,7 @@ function preflight(settings) {
     try {
       const value = JSON.parse(fs.readFileSync(path.join(os.homedir(), ".claude", "settings.json"), "utf8"));
       const url = value?.env?.ANTHROPIC_BASE_URL;
-      if (url && !String(url).includes(`127.0.0.1:${PORT}`)) throw new Error("Claude has a custom ANTHROPIC_BASE_URL. Remove it or disable Claude before applying Headroom.");
+      if (url && !String(url).includes(`127.0.0.1:${proxyPort()}`)) throw new Error("Claude has a custom ANTHROPIC_BASE_URL. Remove it or disable Claude before applying Headroom.");
     } catch (error) { if (error.code !== "ENOENT" && error instanceof SyntaxError) throw new Error("Claude settings.json is not valid JSON."); if (String(error.message).startsWith("Claude has")) throw error; }
   }
   if (settings.targets.includes("codex")) {
@@ -226,7 +300,7 @@ function preflight(settings) {
       const root = value.split(/^\s*\[/m, 1)[0];
       const provider = root.match(/^\s*model_provider\s*=\s*["']([^"']+)["']/m)?.[1];
       const baseUrl = root.match(/^\s*openai_base_url\s*=\s*["']([^"']+)["']/m)?.[1];
-      if ((provider && provider !== "headroom") || (baseUrl && !baseUrl.includes(`127.0.0.1:${PORT}`))) {
+      if ((provider && provider !== "headroom") || (baseUrl && !baseUrl.includes(`127.0.0.1:${proxyPort()}`))) {
         throw new Error("Codex has a custom model provider or OpenAI base URL. Restore its native provider or disable Codex before applying Headroom.");
       }
     } catch (error) {
@@ -235,18 +309,44 @@ function preflight(settings) {
   }
 }
 
+// Best-effort restore to the safe state: profile removed, agents back on
+// their native configuration. Failures surface later as drift warnings.
+async function rollback(binary) {
+  try { await run(binary, ["install", "remove", "--profile", PROFILE], { timeout: 60_000 }); }
+  catch { /* status() will report remaining drift */ }
+}
+
 async function reconcileNow(input) {
   const settings = validateSettings(input); preflight(settings);
   const found = await locate();
-  if (!found.binary || !found.compatible) throw new Error(`Headroom ${MIN_VERSION} or newer is not installed. Run ./setup.sh --headroom ${settings.targets.join(",") || "claude"}.`);
+  if (!found.binary || !found.compatible) throw new Error(`Headroom ${MIN_VERSION} or newer is not installed. Use Install Headroom in Settings first.`);
   if (!settings.targets.length) {
-    if (readManifest()) await run(found.binary, ["install", "remove", "--profile", PROFILE], { timeout: 60_000 });
+    if (readManifest()) {
+      try { await run(found.binary, ["install", "remove", "--profile", PROFILE], { timeout: 60_000 }); }
+      catch (error) { throw new Error(withDetail("Headroom could not be disabled; agent routing may still point at the proxy.", error)); }
+    }
     return status();
   }
+  // Reapplying identical, healthy, correctly-routed settings is a no-op —
+  // saving unrelated settings must not restart the proxy service.
+  const manifest = readManifest();
+  if (manifest && manifest.mode === settings.mode
+    && manifest.targets.slice().sort().join(",") === settings.targets.join(",")
+    && !routingDrift(settings.targets).length
+    && await proxyHealthy()) return status();
   const args = ["install", "apply", "--profile", PROFILE, "--preset", "persistent-service", "--scope", "provider", "--providers", "manual"];
   for (const target of settings.targets) args.push("--target", target);
-  args.push("--port", String(PORT), "--mode", settings.mode, "--no-telemetry");
-  await run(found.binary, args, { timeout: 120_000, maxBuffer: 4 * 1024 * 1024 });
+  args.push("--port", String(proxyPort()), "--mode", settings.mode, "--no-telemetry");
+  try {
+    await run(found.binary, args, { timeout: 120_000, maxBuffer: 4 * 1024 * 1024 });
+  } catch (error) {
+    await rollback(found.binary);
+    throw new Error(withDetail("Headroom could not apply the agent setup; the change was rolled back and agents keep their native configuration.", error));
+  }
+  if (!(await waitForHealthy())) {
+    await rollback(found.binary);
+    throw new Error("Headroom applied the setup but its proxy never became healthy; the change was rolled back and agents keep their native configuration.");
+  }
   return status();
 }
 
@@ -263,4 +363,4 @@ function reconcile(input) {
 
 function installCli() { return queueOperation(installCliNow); }
 
-module.exports = { MIN_VERSION, PORT, PROFILE, workspaceDir, versionAtLeast, locate, locateUv, status, installCli, readSavings, summarizeRecords, validateSettings, reconcile };
+module.exports = { MIN_VERSION, PORT, PROFILE, workspaceDir, versionAtLeast, locate, locateUv, status, installCli, readSavings, summarizeRecords, validateSettings, reconcile, routingDrift, deriveState };

@@ -57,6 +57,24 @@ test("?fresh=1 busts the response cache", async () => {
   }
 });
 
+test("data-source failures degrade to a sanitized per-panel error", async () => {
+  const server = await startServer(0);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const failure = Promise.reject(new Error(`boom reading ${os.homedir()}/secret.db`));
+    failure.catch(() => {}); // matches cached() storing a pending promise
+    _cache.set("memories", { t: Date.now(), v: failure });
+    const response = await fetch(`${base}/api/memories`);
+    assert.strictEqual(response.status, 200);
+    const body = await response.json();
+    assert.match(body.error, /boom reading/);
+    assert.ok(!body.error.includes(os.homedir()), "error must not leak the home directory");
+  } finally {
+    _cache.clear();
+    server.close();
+  }
+});
+
 test("advisor settings and outcomes require same-origin explicit mutations", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lgz-advisor-http-"));
   process.env.LLM_GROUND_ZERO_ADVISOR_PATH = path.join(dir, "advisor.json");

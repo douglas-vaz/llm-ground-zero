@@ -8,6 +8,9 @@ let advisorData = null;
 let lastEvidence = null;
 let headroomSettings = null;
 let headroomMonitorInFlight = false;
+// True while an install/apply/repair is running; blocks the 15s monitor from
+// overwriting in-progress feedback with a stale status snapshot.
+let headroomBusy = false;
 
 if (typeof Chart !== "undefined") {
   Chart.defaults.color = "#9da7b3";
@@ -485,17 +488,40 @@ function savingsRow(label, value, detail) {
   return row;
 }
 
-function headroomStatusText(status = {}) {
-  if (!status.installed) return "Not installed";
-  if (!status.compatible) return `Upgrade required · v${status.version}`;
-  if (!status.targets?.length) return `Ready · v${status.version}`;
-  const agents = status.targets.map((name) => name === "claude" ? "Claude" : "Codex").join(" + ");
-  return status.healthy ? `Healthy · ${agents}` : `Proxy stopped · ${agents}`;
+function headroomState(status = {}) {
+  if (status.state) return status.state;
+  if (!status.installed) return "not-installed";
+  if (!status.compatible) return "upgrade-required";
+  if (!status.targets?.length) return "ready";
+  if (!status.healthy) return "proxy-stopped";
+  if (status.warnings?.length) return "attention";
+  return "active";
 }
+
+function headroomAgents(status = {}) {
+  return (status.targets || []).map((name) => name === "claude" ? "Claude" : "Codex").join(" + ");
+}
+
+function headroomStatusText(status = {}) {
+  switch (headroomState(status)) {
+    case "not-installed": return "Not installed";
+    case "upgrade-required": return `Upgrade required · v${status.version}`;
+    case "ready": return `Ready · v${status.version} · no agents enabled`;
+    case "proxy-stopped": return `Proxy stopped · ${headroomAgents(status)}`;
+    case "attention": return `Needs attention · ${headroomAgents(status)}`;
+    default: return `Healthy · ${headroomAgents(status)}`;
+  }
+}
+
+const HEADROOM_STATE_LEVEL = { active: "ok", ready: "ok", "proxy-stopped": "err", attention: "warn", "upgrade-required": "warn", "not-installed": "" };
 
 function updateHeadroomStatus(status = {}, syncSelections = false) {
   headroomSettings = status;
-  byId("headroomMonitorStatus").textContent = headroomStatusText(status);
+  const state = headroomState(status);
+  const level = HEADROOM_STATE_LEVEL[state] || "";
+  const pill = byId("headroomMonitorStatus");
+  pill.textContent = headroomStatusText(status);
+  pill.className = `status-pill${level ? ` ${level}` : ""}`;
   byId("headroomLiveStatus").textContent = headroomStatusText(status);
   const usable = status.installed && status.compatible;
   for (const id of ["headroomClaude", "headroomCodex", "headroomMode"]) byId(id).disabled = !usable;
@@ -508,6 +534,9 @@ function updateHeadroomStatus(status = {}, syncSelections = false) {
   install.hidden = usable;
   install.disabled = !status.installerAvailable;
   install.textContent = status.installed ? `Upgrade to v${status.minimumVersion || "0.31.0"}` : "Install Headroom";
+  const repair = byId("headroomRepair");
+  repair.hidden = !(usable && status.targets?.length && (state === "proxy-stopped" || state === "attention"));
+  repair.textContent = status.healthy ? "Repair routing" : "Restart proxy";
   if (!usable && !status.installerAvailable) {
     byId("headroomSettingsState").textContent = "uv is required. Install it with Homebrew, then reopen Settings.";
   } else if (status.warnings?.length) {
@@ -516,11 +545,21 @@ function updateHeadroomStatus(status = {}, syncSelections = false) {
 }
 
 function renderSavings(data) {
+  if (data.error && !data.status) {
+    // The status endpoint itself failed — say so instead of implying
+    // Headroom is not installed.
+    const pill = byId("headroomMonitorStatus");
+    pill.textContent = "Status unavailable";
+    pill.className = "status-pill err";
+    replaceCards("savingsCards", [card("Headroom", "Unavailable", "status could not be loaded"), card("Measured reduction", "—", "retry with Refresh"), card("Enabled agents", "—", "unknown while status is unavailable")]);
+    setPanelState("savingsState", data.error, true);
+    return;
+  }
   const status = data.status || {};
-  updateHeadroomStatus(status, false);
+  if (!headroomBusy) updateHeadroomStatus(status, false);
   const input = data.inputCompression || {};
   if (!status.installed) {
-    replaceCards("savingsCards", [card("Headroom", "Not installed", "Run ./setup.sh --headroom claude,codex"), card("Measured reduction", "—", "available after proxied traffic"), card("Enabled agents", "None", "optional and off by default")]);
+    replaceCards("savingsCards", [card("Headroom", "Not installed", "install from Settings → Configure agents"), card("Measured reduction", "—", "available after proxied traffic"), card("Enabled agents", "None", "optional and off by default")]);
   } else if (!status.targets?.length) {
     replaceCards("savingsCards", [card("Headroom", `v${status.version}`, "ready, not enabled"), card("Measured reduction", "—", "select an agent in Settings"), card("Proxy", status.healthy ? "Healthy" : "Stopped", `cache-aware mode available`)]);
   } else {
@@ -538,6 +577,7 @@ function renderSavings(data) {
     savingsRow("Mode", status.mode || "cache"),
     savingsRow("Overhead", `${number(data.reliability?.averageOptimizationMs)} ms avg`),
   );
+  if (status.warnings?.length) health.append(element("p", "err", status.warnings.join(" ")));
   const agentRows = (data.agents || []).map((agent) => savingsRow(
     agent.agent === "claude" ? "Claude Code" : agent.agent === "codex" ? "Codex" : "Unknown client",
     `${formatTokens(agent.tokensSaved)} saved · ${number(agent.reductionPercent).toFixed(1)}%`,
@@ -765,18 +805,47 @@ byId("clearOutcome").addEventListener("click", async () => {
 byId("addSubscription").addEventListener("click", () => byId("subscriptionRows").append(subscriptionRow()));
 byId("headroomInstall").addEventListener("click", async () => {
   const button = byId("headroomInstall");
+  headroomBusy = true;
   button.disabled = true;
   button.textContent = headroomSettings?.installed ? "Upgrading…" : "Installing…";
+  byId("headroomLiveStatus").textContent = headroomSettings?.installed ? "Upgrading…" : "Installing…";
   byId("headroomSettingsState").textContent = "Installing the tested Headroom CLI with uv. Agent routing will remain unchanged.";
   try {
     const status = await mutate("/api/headroom/install", "POST", {});
     updateHeadroomStatus(status, true);
     byId("headroomSettingsState").textContent = `Headroom v${status.version} is ready. Choose agents, then Apply settings.`;
+    headroomBusy = false;
     await load(true);
   } catch (error) {
+    headroomBusy = false;
     byId("headroomSettingsState").textContent = error.message;
+    if (headroomSettings) updateHeadroomStatus(headroomSettings, false);
     button.disabled = !headroomSettings?.installerAvailable;
     button.textContent = headroomSettings?.installed ? `Upgrade to v${headroomSettings.minimumVersion || "0.31.0"}` : "Install Headroom";
+  }
+});
+
+byId("headroomRepair").addEventListener("click", async () => {
+  const button = byId("headroomRepair");
+  const current = headroomSettings;
+  if (!current?.targets?.length) return;
+  headroomBusy = true;
+  button.disabled = true;
+  const label = button.textContent;
+  button.textContent = "Repairing…";
+  byId("headroomMonitorStatus").textContent = "Repairing…";
+  try {
+    const status = await mutate("/api/headroom/settings", "PUT", { targets: current.targets, mode: current.mode || "cache" });
+    headroomBusy = false;
+    updateHeadroomStatus(status, false);
+    await load(true);
+  } catch (error) {
+    headroomBusy = false;
+    setPanelState("savingsState", error.message, true);
+    if (headroomSettings) updateHeadroomStatus(headroomSettings, false);
+  } finally {
+    button.disabled = false;
+    button.textContent = label;
   }
 });
 
@@ -788,28 +857,58 @@ byId("settingsForm").addEventListener("submit", async (event) => {
     monthlyPrice: number(row.querySelector('[name="monthlyPrice"]').value),
     currency: row.querySelector('[name="currency"]').value,
   }));
+  const submit = byId("settingsForm").querySelector('button[type="submit"]');
+  let phase = "plans";
+  submit.disabled = true;
   try {
     const targets = [];
     if (byId("headroomClaude").checked) targets.push("claude");
     if (byId("headroomCodex").checked) targets.push("codex");
-    if (headroomSettings?.installed && headroomSettings.compatible) await mutate("/api/headroom/settings", "PUT", { targets, mode: byId("headroomMode").value });
+    if (headroomSettings?.installed && headroomSettings.compatible) {
+      phase = "headroom";
+      headroomBusy = true;
+      byId("headroomSettingsState").textContent = targets.length
+        ? "Applying the Headroom agent setup — this can take up to two minutes…"
+        : "Disabling Headroom and restoring native agent configuration…";
+      const status = await mutate("/api/headroom/settings", "PUT", { targets, mode: byId("headroomMode").value });
+      headroomBusy = false;
+      updateHeadroomStatus(status, true);
+      byId("headroomSettingsState").textContent = "";
+      phase = "plans";
+    }
     await mutate("/api/advisor/settings", "PUT", { subscriptions });
     closeDialog("settingsDialog");
     await load(true);
-  } catch (error) { byId("settingsState").textContent = error.message; }
+  } catch (error) {
+    headroomBusy = false;
+    if (phase === "headroom") {
+      byId("headroomSettingsState").textContent = error.message;
+      byId("settingsState").textContent = "Headroom changes failed; plan settings were not saved.";
+      if (headroomSettings) updateHeadroomStatus(headroomSettings, false);
+    } else {
+      byId("settingsState").textContent = error.message;
+    }
+  } finally {
+    submit.disabled = false;
+  }
 });
 
 byId("refresh").addEventListener("click", () => load(true));
 byId("range").addEventListener("change", () => load(true));
 async function monitorHeadroom() {
-  if (headroomMonitorInFlight) return;
+  if (headroomMonitorInFlight || headroomBusy) return;
   headroomMonitorInFlight = true;
   try {
     const response = await fetch("/api/headroom/status?fresh=1");
     if (!response.ok) throw new Error("status unavailable");
-    updateHeadroomStatus(await response.json(), false);
+    const status = await response.json();
+    if (!headroomBusy) updateHeadroomStatus(status, false);
   } catch {
-    byId("headroomMonitorStatus").textContent = "Status unavailable";
+    if (!headroomBusy) {
+      const pill = byId("headroomMonitorStatus");
+      pill.textContent = "Status unavailable";
+      pill.className = "status-pill err";
+    }
   } finally { headroomMonitorInFlight = false; }
 }
 selectView(location.hash.slice(1) || "overview", false);

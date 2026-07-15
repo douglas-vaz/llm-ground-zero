@@ -45,6 +45,16 @@
   in a separate Apply step.
 - Delegates reversible provider mutations to Headroom's official installer;
   memory, learn, output shaping, and telemetry remain off.
+- Reconcile is self-healing (branch `claude/headroom-integration-improvements-e67e17`):
+  apply verifies proxy `/health` (bounded wait, `LLM_GROUND_ZERO_HEADROOM_HEALTH_WAIT_MS`),
+  rolls back to `install remove` on any apply/health failure, no-ops when the
+  requested settings already match a healthy, correctly-routed manifest, and
+  `status()` reports a derived `state` plus routing-drift warnings when an
+  enabled agent's config stops pointing at the proxy.
+- The UI shows a colored state pill (ok/warn/err), a Restart proxy / Repair
+  routing action when degraded, apply/install progress feedback that the 15 s
+  monitor cannot clobber (`headroomBusy`), and a distinct "Status unavailable"
+  presentation when the status endpoint itself fails.
 
 ## Verification
 
@@ -100,10 +110,15 @@
 
 ## Next steps
 
-1. Monitor user feedback and sanitized runtime logs for advisor/Headroom edge cases.
-2. Improve the offline state so a stopped server is distinguished from seven
-   independent data-source failures.
-3. Address the GitHub Actions Node 20 deprecation annotation by upgrading
+1. Merge branch `claude/headroom-integration-improvements-e67e17` (headroom
+   setup robustness: rollback, health verification, drift detection, state
+   UI). Suite is 35 passing there; it also fixes a latent `sanitize`
+   ReferenceError in `server.js`'s guard() error path.
+2. Monitor user feedback and sanitized runtime logs for advisor/Headroom edge cases.
+3. Improve the offline state so a stopped server is distinguished from seven
+   independent data-source failures (the Headroom pill now handles its own
+   unavailable state; the other panels still do not).
+4. Address the GitHub Actions Node 20 deprecation annotation by upgrading
    checkout/setup-node actions when stable versions are available.
 
 _Last updated: 2026-07-15_
