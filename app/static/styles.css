@@ -103,6 +103,7 @@ button {
   justify-content: center;
   padding: 7px 10px;
 }
+button[hidden] { display: none; }
 button:hover { border-color: var(--dim); }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button:disabled { cursor: wait; opacity: .55; }
@@ -229,7 +230,6 @@ dialog form > label { color: var(--dim); display: grid; font-size: 12px; gap: 5p
 .headroom-install-row { border-bottom: 1px solid var(--border); justify-content: space-between; margin-bottom: 12px; padding-bottom: 12px; }
 .headroom-install-row strong { font-size: 12px; }
 .headroom-install-row button { color: var(--accent); }
-.headroom-install-row button[hidden] { display: none; }
 .toggle-row { align-items: center; display: flex; font-size: 12px; gap: 8px; margin: 7px 0; }
 .toggle-row input { width: auto; }
 .toggle-row span { color: var(--dim); font-size: 10px; margin-left: auto; }

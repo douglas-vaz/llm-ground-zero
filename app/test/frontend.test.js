@@ -8,6 +8,10 @@ const staticDir = path.join(__dirname, "..", "static");
 test("frontend uses local assets and safe DOM rendering", () => {
   const html = fs.readFileSync(path.join(staticDir, "index.html"), "utf8");
   const js = fs.readFileSync(path.join(staticDir, "app.js"), "utf8");
+  const css = fs.readFileSync(path.join(staticDir, "styles.css"), "utf8");
+  // The base button rule sets display, which beats the UA [hidden] style —
+  // without this rule, hidden buttons (install, repair) stay visible.
+  assert.ok(css.includes("button[hidden] { display: none; }"));
   assert.ok(html.includes('src="/vendor/chart.umd.js"'));
   assert.ok(!html.includes("https://"));
   assert.ok(!js.includes("innerHTML"));
