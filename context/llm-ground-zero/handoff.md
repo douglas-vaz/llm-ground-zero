@@ -2,28 +2,29 @@
 
 ## Current state
 
-- Working branch: `main`; the in-app Headroom installer/status increment is released.
+- Working branch: `main` at `30ba8fb`; the Headroom hardening branch
+  (`claude/headroom-integration-improvements-e67e17`) is merged, released, and
+  can be deleted.
 - The approved AI Usage Advisor spec, implementation checklist, analysis
   engine, secured local API, and responsive five-view dashboard are implemented.
-- Version is v0.3.2 and the Electron package allowlist includes the
-  advisor and Headroom integration runtime modules.
+- Version is v0.3.3, published from tag `v0.3.3` (GitHub Actions run
+  `29433949862`) with universal DMG checksum
+  `ef7ae2cdca607b855c8374a58da3bbe37a8205b79aab98c1858fcc3ba1043d0f`
+  (verified locally against the downloaded asset).
+- Homebrew tap commit `98ea051` points at the v0.3.3 DMG; the local
+  `/Applications/LLM Ground Zero.app` is the brew-installed v0.3.3, quarantine
+  cleared, smoke-tested on port 7788.
 - Existing untracked `context/ai-central/` remains untouched.
-- v0.3.1 is published from tag `v0.3.1` at main commit `164034a`; GitHub Actions
-  run `29418238356` rebuilt, tested, checksummed, and published the universal
-  DMG successfully.
-- Homebrew tap commit `5b4dd19` points to the CI-built DMG checksum
-  `9c63bcc57e1b9f59d6b089b4667c77c8e61f994c4b06604ad8ddb060d898de1d`.
-- Homebrew-installed `/Applications/LLM Ground Zero.app` is v0.3.1, quarantine
-  is cleared, and the app is open after a successful smoke test on port 7788.
-- v0.3.2 is published from tag `v0.3.2` at main commit `5225e07`; GitHub Actions
-  run `29420929494` published the universal DMG with checksum
-  `62ed5671a88efde47b339e50fb8ec2e34834fc1550ec92139a9c6947235206df`.
-- The Homebrew tap and local app remain on v0.3.1; they were not part of the
-  v0.3.2 fix/package request.
-- The optional Headroom integration, design record, checklist, sanitized
-  screenshot, setup path, local API, Settings controls, and Token savings view
-  are implemented. Headroom remains disabled by default.
-- In-app Headroom install/upgrade and 15-second status monitoring are released.
+- Earlier releases for reference: v0.3.1 (run `29418238356`, checksum
+  `9c63bcc5…`), v0.3.2 (run `29420929494`, checksum `62ed5671…`; never tapped).
+- The optional Headroom integration is implemented and, on this machine,
+  ACTIVE (see Live machine state below). It remains disabled by default for
+  fresh installs.
+- v0.3.3 adds: reconcile rollback + proxy health verification, routing-drift
+  detection, derived state field + colored status pill, Repair action,
+  progress feedback, fixture-mode mutation guard, default `~/.headroom`
+  workspace (launchd fix), `button[hidden]` CSS fix, and the `sanitize`
+  import fix in server.js guard().
 
 ## Implemented behavior
 
@@ -123,9 +124,9 @@
 
 ## Live machine state (2026-07-16)
 
-- `/Applications/LLM Ground Zero.app` is a local unsigned build of the branch
-  (v0.3.2 + headroom hardening), installed over the Homebrew copy via ditto.
-  The Homebrew tap still points at the release v0.3.1 DMG.
+- `/Applications/LLM Ground Zero.app` is the brew-installed release v0.3.3
+  (upgraded via the tap; quarantine cleared; headroom state survived the
+  app replacement).
 - Headroom is ACTIVE: profile `llm-ground-zero` in `~/.headroom`, proxy
   healthy on 8791, targets claude+codex, cache mode. Claude Code routes via
   `env.ANTHROPIC_BASE_URL` in `~/.claude/settings.json`; codex via the
@@ -136,19 +137,14 @@
 
 ## Next steps
 
-1. Merge branch `claude/headroom-integration-improvements-e67e17` (headroom
-   setup robustness: rollback, health verification, drift detection, state
-   UI, default-workspace fix, hidden-button CSS fix, fixture-mode guard; also
-   fixes a latent `sanitize` ReferenceError in `server.js` guard()). Suite:
-   36 node tests + 16 shell checks passing.
-2. Report the two upstream Headroom v0.31.0 issues: launchd service ignores
+1. Report the two upstream Headroom v0.31.0 issues: launchd service ignores
    `HEADROOM_WORKSPACE_DIR`, and the codex config writer appends into an open
    TOML table.
-3. Monitor user feedback and sanitized runtime logs for advisor/Headroom edge cases.
-4. Improve the offline state so a stopped server is distinguished from seven
+2. Monitor user feedback and sanitized runtime logs for advisor/Headroom edge cases.
+3. Improve the offline state so a stopped server is distinguished from seven
    independent data-source failures (the Headroom pill now handles its own
    unavailable state; the other panels still do not).
-5. Address the GitHub Actions Node 20 deprecation annotation by upgrading
+4. Address the GitHub Actions Node 20 deprecation annotation by upgrading
    checkout/setup-node actions when stable versions are available.
 
 _Last updated: 2026-07-16_
