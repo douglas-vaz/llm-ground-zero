@@ -16,6 +16,7 @@ test("frontend uses local assets and safe DOM rendering", () => {
   assert.ok(js.includes("localDateKey"));
   assert.ok(html.includes('data-view="overview"'));
   assert.ok(html.includes('data-view="usage"'));
+  assert.ok(html.includes('data-view="savings"'));
   assert.ok(html.includes('id="outcomeDialog"'));
   assert.ok(html.includes('id="settingsDialog"'));
   assert.ok(js.includes('"X-LLM-Ground-Zero-Action": "1"'));
@@ -26,4 +27,5 @@ test("frontend uses local assets and safe DOM rendering", () => {
 test("electron package includes advisor runtime modules", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
   assert.ok(pkg.build.files.includes("advisor/**"));
+  assert.ok(pkg.build.files.includes("integrations/**"));
 });

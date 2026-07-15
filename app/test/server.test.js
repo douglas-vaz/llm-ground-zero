@@ -104,3 +104,30 @@ test("advisor settings and outcomes require same-origin explicit mutations", asy
     delete process.env.LLM_GROUND_ZERO_ADVISOR_PATH;
   }
 });
+
+test("Headroom endpoints expose measured savings and protect mutations", async () => {
+  process.env.LLM_GROUND_ZERO_HEADROOM_FIXTURE = path.join(__dirname, "fixtures", "headroom", "dashboard.json");
+  _cache.clear();
+  const server = await startServer(0);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const response = await fetch(`${base}/api/headroom?range=30d`);
+    assert.strictEqual(response.status, 200);
+    const savings = await response.json();
+    assert.strictEqual(savings.status.targets.join(","), "claude,codex");
+    assert.strictEqual(savings.inputCompression.tokensSaved, 341200);
+    assert.strictEqual(savings.inputCompression.measurement, "measured");
+
+    const status = await fetch(`${base}/api/headroom/status`).then((value) => value.json());
+    assert.strictEqual(status.healthy, true);
+
+    assert.strictEqual((await fetch(`${base}/api/headroom?range=14d`)).status, 400);
+    assert.strictEqual((await fetch(`${base}/api/headroom/settings`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: "{}",
+    })).status, 403);
+  } finally {
+    _cache.clear();
+    server.close();
+    delete process.env.LLM_GROUND_ZERO_HEADROOM_FIXTURE;
+  }
+});

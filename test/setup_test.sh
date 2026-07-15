@@ -79,6 +79,16 @@ assert "codex engram block not duplicated" \
 # Data dir created
 assert "data/ directory exists" test -d "$REPO_DIR/data"
 
+bash "$REPO_DIR/setup.sh" --headroom claude,codex --headroom-mode cache >/dev/null 2>&1
+assert "explicit Headroom setup selects Claude and Codex" \
+  grep -q 'install apply.*--target claude.*--target codex.*--port 8791.*--mode cache.*--no-telemetry' "$HOME/headroom-invocations.log"
+assert "explicit Headroom setup pins the tested CLI version" \
+  grep -q 'tool install --force --python 3.13 headroom-ai\[proxy\]==0.31.0' "$HOME/uv-invocations.log"
+assert "default setup never configures Headroom" \
+  test "$(grep -c 'install apply' "$HOME/headroom-invocations.log")" = "1"
+assert "Gemini Headroom setup is rejected" \
+  sh -c "! bash '$REPO_DIR/setup.sh' --headroom gemini >/dev/null 2>&1"
+
 echo
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES failure(s)"; exit 1; fi
 echo "All tests passed."

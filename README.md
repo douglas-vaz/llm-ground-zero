@@ -1,6 +1,6 @@
 # llm-ground-zero
 
-> One memory, every coding agent. A shared brain + usage dashboard for
+> One memory, every coding agent. A shared brain + usage and token-savings dashboard for
 > Claude Code, Codex CLI, Gemini CLI and friends — on subscription plans,
 > with no API keys.
 
@@ -21,6 +21,9 @@ be useful to you too.
 - **An AI Usage Advisor** that turns those local records into an outcome
   ledger, explainable workflow-friction signals, reusable-knowledge prompts,
   and evidence-backed next actions
+- **Optional Headroom compression** for Claude Code and Codex, independently
+  enabled, with measured before/after/saved token totals, per-agent reduction,
+  daily trends, transform activity, and proxy overhead
 - **Shared memory between agents** — switch from Claude Code to Codex
   mid-task and it picks up where the other left off, via file-based handoffs
   and a searchable Engram memory store over MCP
@@ -63,6 +66,28 @@ cd ~/llm-ground-zero && ./setup.sh
 the Engram MCP server with every detected agent; and wires `agents/AGENTS.md`
 into each agent's global instructions. Restart your agents afterwards.
 
+### Optional: enable Headroom
+
+[Headroom](https://github.com/headroomlabs-ai/headroom) runs a local proxy that
+compresses eligible context before it reaches the model. It is never installed
+or enabled by default. To install the tested version and enable it for both
+supported agents:
+
+```bash
+./setup.sh --headroom claude,codex --headroom-mode cache
+```
+
+Use `claude` or `codex` alone to enable only that agent. After Headroom is
+installed, the app's **Settings** dialog can change the selected agents or
+switch between `cache` mode (the default, tuned for stable provider prompt
+caches) and `token` mode (maximum prompt reduction). Applying with neither
+agent selected removes LLM Ground Zero's Headroom profile and restores the
+provider configuration managed by Headroom.
+
+Gemini remains available for shared memory and usage reporting, but Headroom
+v0.31.0 does not expose Gemini CLI as a persistent-install target, so its
+Headroom toggle is intentionally disabled.
+
 ## How it works
 
 ```mermaid
@@ -86,6 +111,7 @@ flowchart LR
 
     APP["LLM Ground Zero.app<br>127.0.0.1:7788"]
     CU["ccusage"]
+    HR["Headroom proxy<br>127.0.0.1:8791"]
 
     CC -- "mem_save / mem_search" --> EN
     CX -- "mem_save / mem_search" --> EN
@@ -103,12 +129,17 @@ flowchart LR
     APP -- "conversations,<br>tool usage" --> CL
     APP --> CO
     APP -- "memory feed" --> DB
+    CC -. "optional compressed context" .-> HR
+    CX -. "optional compressed context" .-> HR
+    APP -- "measured token savings" --> HR
 ```
 
-Every arrow out of the app is a local, read-only file access — the app never
-writes to agent data and nothing leaves your machine. The advisor writes only
-your explicit subscription settings and outcome corrections to an app-owned
-JSON file. It never edits session logs, shared handoffs, or Engram memories.
+All dashboard data access stays local. The advisor writes only your explicit
+subscription settings and outcome corrections to an app-owned JSON file. When
+you explicitly apply Headroom settings, the app delegates reversible provider
+configuration and local-service management to Headroom's official installer;
+it never edits those provider files itself. It never edits session logs, shared
+handoffs, or Engram memories.
 
 Memory lives in two tiers.
 
@@ -126,7 +157,10 @@ projects. Backup = copy the file.
 The dashboard reads: `ccusage` data for spend, `~/.claude/projects` for
 Claude conversations and tool usage, `~/.codex/sessions` for Codex
 conversations, and `engram.db` for the memory feed. All agent-owned sources
-are read-only and local, and the server binds to `127.0.0.1` only.
+are read-only and local. When enabled, it also reads sanitized token counters
+from Headroom's local CLI/logs; prompts, responses, request IDs, credentials,
+and raw logs are never sent to the browser. The server binds to `127.0.0.1`
+only.
 
 ## AI Usage Advisor
 
@@ -147,6 +181,22 @@ The original spend, charts, conversations, tools, and memory feed remain in the
 **Usage** view. The shared 7/30/90-day range control refreshes advisor analysis;
 settings let you enter subscription costs for plan-fit context.
 
+## Token savings
+
+The **Token savings** view reports Headroom's locally measured input
+compression over the selected 7/30/90-day range:
+
+- tokens before compression, tokens after compression, and the difference;
+- the weighted reduction rate (`saved / before`) overall and by agent;
+- daily saved-token and reduction trends, actual log coverage, transforms used,
+  proxy health, and average optimization overhead.
+
+These figures are your measured proxy records, not Headroom's benchmark claim.
+Provider cache reads, CLI filtering, and output-shaping estimates are different
+counterfactuals and are not added to the measured input-compression number.
+Output shaping, Headroom memory, learning, and anonymous telemetry are disabled
+by this integration; Engram remains the shared-memory authority.
+
 Advisor recommendations are deterministic heuristics, not model judgments.
 They show confidence and data coverage, treat unsupported zero-dollar pricing
 as **unpriced** rather than free, and avoid cancellation advice until there is
@@ -158,6 +208,13 @@ never silently write rules, context packs, decisions, skills, or memories.
 If a panel shows an error, check `~/Library/Logs/llm-ground-zero/error.log`.
 The log contains only anonymized error data — no conversation content,
 usernames, or file paths — so it is safe to attach to a GitHub issue.
+
+For Headroom, open **Settings** and check the version, profile health, selected
+agents, and mode. The integration pins `headroom-ai[proxy]==0.31.0`, keeps its
+state under `~/Library/Application Support/LLM Ground Zero/headroom`, and owns
+only the `llm-ground-zero` deployment profile on port 8791. Re-running the
+optional setup command reconciles that profile without touching unrelated
+Headroom installations.
 
 ## Per-agent reference
 
@@ -235,6 +292,12 @@ engram search "query"          # or from any agent via the mem_search tool
 
 **Inspect memory:** `engram` (TUI) or `engram serve` (HTTP API on :7437).
 
+**Inspect Headroom savings** (when enabled):
+
+```bash
+HEADROOM_WORKSPACE_DIR="$HOME/Library/Application Support/LLM Ground Zero/headroom" headroom perf
+```
+
 ## Built on
 
 This project is mostly glue around excellent open-source work — credit where
@@ -248,6 +311,9 @@ it's due:
   panel.
 - [tokscale](https://github.com/junhoyeo/tokscale) — terminal usage
   visualizations, installed by `setup.sh`.
+- [Headroom](https://github.com/headroomlabs-ai/headroom) — the optional,
+  local-first context-compression proxy behind per-agent token reduction and
+  the measured Token savings view. Installed only with explicit opt-in.
 - [Electron](https://www.electronjs.org/) and
   [electron-builder](https://www.electron.build/) — the app shell and the
   dmg packaging.

@@ -6,6 +6,7 @@ const charts = new Map();
 let loadInFlight = false;
 let advisorData = null;
 let lastEvidence = null;
+let headroomSettings = null;
 
 if (typeof Chart !== "undefined") {
   Chart.defaults.color = "#9da7b3";
@@ -476,9 +477,59 @@ function renderAdvisor(data) {
   renderKnowledge(data);
 }
 
+function savingsRow(label, value, detail) {
+  const row = element("div", "savings-row");
+  row.append(element("strong", "", label), element("span", "", value));
+  if (detail) row.append(element("small", "", detail));
+  return row;
+}
+
+function renderSavings(data) {
+  const status = data.status || {};
+  const input = data.inputCompression || {};
+  if (!status.installed) {
+    replaceCards("savingsCards", [card("Headroom", "Not installed", "Run ./setup.sh --headroom claude,codex"), card("Measured reduction", "—", "available after proxied traffic"), card("Enabled agents", "None", "optional and off by default")]);
+  } else if (!status.targets?.length) {
+    replaceCards("savingsCards", [card("Headroom", `v${status.version}`, "ready, not enabled"), card("Measured reduction", "—", "select an agent in Settings"), card("Proxy", status.healthy ? "Healthy" : "Stopped", `cache-aware mode available`)]);
+  } else {
+    replaceCards("savingsCards", [
+      card("Input tokens saved", formatTokens(input.tokensSaved), `${input.measurement || "measured"} · ${number(input.reductionPercent).toFixed(1)}% reduction`),
+      card("Before → after", `${formatTokens(input.tokensBefore)} → ${formatTokens(input.tokensAfter)}`, `${data.coverage?.records || 0} proxied requests`),
+      card("Enabled agents", status.targets.map((name) => name === "claude" ? "Claude" : "Codex").join(" + "), `${status.mode} mode · Headroom v${status.version}`),
+    ]);
+  }
+
+  const health = byId("headroomHealth");
+  health.replaceChildren(
+    savingsRow("Installed", status.installed ? `v${status.version}` : "No"),
+    savingsRow("Proxy", status.healthy ? "Healthy" : "Stopped"),
+    savingsRow("Mode", status.mode || "cache"),
+    savingsRow("Overhead", `${number(data.reliability?.averageOptimizationMs)} ms avg`),
+  );
+  const agentRows = (data.agents || []).map((agent) => savingsRow(
+    agent.agent === "claude" ? "Claude Code" : agent.agent === "codex" ? "Codex" : "Unknown client",
+    `${formatTokens(agent.tokensSaved)} saved · ${number(agent.reductionPercent).toFixed(1)}%`,
+    `${agent.requests} requests · ${formatTokens(agent.tokensBefore)} before → ${formatTokens(agent.tokensAfter)} after`,
+  ));
+  byId("agentSavings").replaceChildren(...(agentRows.length ? agentRows : [element("p", "empty", status.targets?.length ? "No proxied requests in this range." : "Enable an agent to begin measuring.")]));
+  const transforms = (data.transforms || []).slice(0, 6).map((item) => savingsRow(item.name.replaceAll("_", " "), `${item.uses} uses`));
+  byId("headroomTransforms").replaceChildren(...(transforms.length ? transforms : [element("p", "empty", "No compression transforms recorded yet.")]));
+
+  const daily = data.daily || [];
+  if (daily.length) {
+    makeChart("savingsChart", {
+      type: "bar",
+      data: { labels: daily.map((day) => day.date.slice(5)), datasets: [{ label: "Input tokens saved", data: daily.map((day) => day.tokensSaved), backgroundColor: PALETTE[3] }] },
+      options: { plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: formatTokens } } } },
+    }, "savingsChartState", `Measured daily Headroom input token savings across ${daily.length} days`);
+  } else { destroyChart("savingsChart"); setPanelState("savingsChartState", status.targets?.length ? "No measured traffic in this range." : "Enable Headroom for an agent to begin measuring."); }
+  const coverage = data.coverage || {};
+  setPanelState("savingsState", data.error || (coverage.oldest ? `Coverage ${String(coverage.oldest).slice(0, 10)} to ${String(coverage.newest).slice(0, 10)}. Proxy compression is measured; cache and output effects are not included.` : ""), Boolean(data.error));
+}
+
 async function fetchJson(source, fresh) {
   const range = byId("range").value;
-  const path = source === "advisor" ? `/api/advisor?range=${encodeURIComponent(range)}` : `/api/${source}`;
+  const path = source === "advisor" || source === "headroom" ? `/api/${source}?range=${encodeURIComponent(range)}` : `/api/${source}`;
   const response = await fetch(`${path}${fresh ? (path.includes("?") ? "&fresh=1" : "?fresh=1") : ""}`);
   if (!response.ok) throw new Error(`${source} returned HTTP ${response.status}`);
   return response.json();
@@ -493,11 +544,12 @@ async function load(fresh = false) {
   loadInFlight = true;
   byId("status").textContent = fresh ? "refreshing…" : "loading…";
   byId("refresh").disabled = true;
-  const sources = ["advisor", "usage", "blocks", "tools", "conversations", "memories"];
+  const sources = ["advisor", "headroom", "usage", "blocks", "tools", "conversations", "memories"];
   try {
     const results = await Promise.allSettled(sources.map((source) => fetchJson(source, fresh)));
     const data = Object.fromEntries(results.map((result, index) => [sources[index], settledValue(result, sources[index])]));
     renderAdvisor(data.advisor);
+    renderSavings(data.headroom);
     renderSummaries(data.usage, data.blocks);
     renderUsageCharts(data.usage);
     renderTools(data.tools);
@@ -516,7 +568,7 @@ async function load(fresh = false) {
 }
 
 function selectView(name, updateHash = true) {
-  const valid = ["overview", "waste", "outcomes", "knowledge", "usage"];
+  const valid = ["overview", "waste", "outcomes", "knowledge", "savings", "usage"];
   const selected = valid.includes(name) ? name : "overview";
   document.querySelectorAll("[data-view]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.view === selected)));
   document.querySelectorAll("[data-view-panel]").forEach((panel) => { panel.hidden = panel.dataset.viewPanel !== selected; });
@@ -624,12 +676,19 @@ function subscriptionRow(value = {}) {
 
 async function openSettings() {
   byId("settingsState").textContent = "";
+  byId("headroomSettingsState").textContent = "";
   showDialog("settingsDialog");
   try {
-    const response = await fetch("/api/advisor/settings");
-    const data = await response.json();
-    const rows = data.subscriptions.map(subscriptionRow);
+    const [plansResponse, headroomResponse] = await Promise.all([fetch("/api/advisor/settings"), fetch("/api/headroom/status")]);
+    const data = await plansResponse.json(); headroomSettings = await headroomResponse.json();
+    const rows = (data.subscriptions || []).map(subscriptionRow);
     byId("subscriptionRows").replaceChildren(...(rows.length ? rows : [subscriptionRow()]));
+    byId("headroomClaude").checked = headroomSettings.targets?.includes("claude");
+    byId("headroomCodex").checked = headroomSettings.targets?.includes("codex");
+    byId("headroomMode").value = headroomSettings.mode || "cache";
+    const usable = headroomSettings.installed && headroomSettings.compatible;
+    for (const id of ["headroomClaude", "headroomCodex", "headroomMode"]) byId(id).disabled = !usable;
+    if (!usable) byId("headroomSettingsState").textContent = headroomSettings.installed ? "Headroom 0.31.0 or newer is required." : "Not installed. Run ./setup.sh --headroom claude,codex.";
   } catch {
     byId("settingsState").textContent = "Could not load plan settings.";
   }
@@ -686,6 +745,10 @@ byId("settingsForm").addEventListener("submit", async (event) => {
     currency: row.querySelector('[name="currency"]').value,
   }));
   try {
+    const targets = [];
+    if (byId("headroomClaude").checked) targets.push("claude");
+    if (byId("headroomCodex").checked) targets.push("codex");
+    if (headroomSettings?.installed && headroomSettings.compatible) await mutate("/api/headroom/settings", "PUT", { targets, mode: byId("headroomMode").value });
     await mutate("/api/advisor/settings", "PUT", { subscriptions });
     closeDialog("settingsDialog");
     await load(true);

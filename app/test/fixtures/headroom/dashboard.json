@@ -1,0 +1,45 @@
+{
+  "status": {
+    "installed": true,
+    "compatible": true,
+    "version": "0.31.0",
+    "healthy": true,
+    "targets": ["claude", "codex"],
+    "mode": "cache",
+    "warnings": []
+  },
+  "savings": {
+    "coverage": {
+      "requestedDays": 30,
+      "records": 184,
+      "oldest": "2026-06-16T08:12:00Z",
+      "newest": "2026-07-15T11:48:00Z"
+    },
+    "inputCompression": {
+      "tokensBefore": 1682400,
+      "tokensAfter": 1341200,
+      "tokensSaved": 341200,
+      "reductionPercent": 20.3,
+      "measurement": "measured"
+    },
+    "agents": [
+      {"agent":"claude","requests":96,"tokensBefore":942000,"tokensAfter":731000,"tokensSaved":211000,"reductionPercent":22.4},
+      {"agent":"codex","requests":88,"tokensBefore":740400,"tokensAfter":610200,"tokensSaved":130200,"reductionPercent":17.6}
+    ],
+    "daily": [
+      {"date":"2026-07-09","tokensBefore":232000,"tokensSaved":48000,"reductionPercent":20.7},
+      {"date":"2026-07-10","tokensBefore":284000,"tokensSaved":62000,"reductionPercent":21.8},
+      {"date":"2026-07-11","tokensBefore":198000,"tokensSaved":37000,"reductionPercent":18.7},
+      {"date":"2026-07-12","tokensBefore":251000,"tokensSaved":51000,"reductionPercent":20.3},
+      {"date":"2026-07-13","tokensBefore":327000,"tokensSaved":68000,"reductionPercent":20.8},
+      {"date":"2026-07-14","tokensBefore":246000,"tokensSaved":48000,"reductionPercent":19.5},
+      {"date":"2026-07-15","tokensBefore":144400,"tokensSaved":27200,"reductionPercent":18.8}
+    ],
+    "transforms": [
+      {"name":"content_router","uses":142},
+      {"name":"smart_crusher","uses":87},
+      {"name":"cache_aligner","uses":184}
+    ],
+    "reliability": {"averageOptimizationMs":84}
+  }
+}

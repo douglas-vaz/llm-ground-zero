@@ -219,6 +219,20 @@ dialog form > label { color: var(--dim); display: grid; font-size: 12px; gap: 5p
 .subscription-row { align-items: end; border-bottom: 1px solid var(--border); display: grid; gap: 8px; grid-template-columns: 1fr 1fr 100px 75px auto; padding: 10px 0; }
 .subscription-row label { color: var(--dim); display: grid; font-size: 10px; gap: 4px; }
 .subscription-row input { min-width: 0; width: 100%; }
+.headroom-settings { border: 1px solid var(--border); border-radius: 8px; margin: 0 0 18px; padding: 14px; }
+.headroom-settings legend { font-size: 13px; font-weight: 650; padding: 0 6px; }
+.headroom-settings > p { color: var(--dim); font-size: 11px; margin-bottom: 9px; }
+.toggle-row { align-items: center; display: flex; font-size: 12px; gap: 8px; margin: 7px 0; }
+.toggle-row input { width: auto; }
+.toggle-row span { color: var(--dim); font-size: 10px; margin-left: auto; }
+.toggle-row.disabled { color: var(--dim); }
+.mode-row { align-items: center; color: var(--dim); display: flex; font-size: 12px; gap: 10px; margin-top: 12px; }
+dialog h3 { font-size: 13px; margin: 2px 0 5px; }
+.health-list, .savings-table, .transform-list { border-top: 1px solid var(--border); }
+.savings-row { align-items: baseline; border-bottom: 1px solid var(--border); display: grid; gap: 3px 10px; grid-template-columns: minmax(0, 1fr) auto; padding: 10px 0; }
+.savings-row strong { font-size: 12px; text-transform: capitalize; }
+.savings-row > span { color: var(--green); font-size: 12px; font-weight: 650; text-align: right; }
+.savings-row small { color: var(--dim); font-size: 10px; grid-column: 1 / -1; }
 
 .panel-state { color: var(--dim); font-size: 13px; margin-top: 8px; }
 .panel-state:empty { display: none; }

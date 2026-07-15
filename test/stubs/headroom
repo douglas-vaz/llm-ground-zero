@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -eu
+printf '%s\n' "$*" >> "$HOME/headroom-invocations.log"
+if [ "${1:-}" = "--version" ]; then echo "headroom 0.28.0"; fi

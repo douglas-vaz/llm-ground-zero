@@ -1,8 +1,8 @@
 {
   "name": "llm-ground-zero",
   "productName": "LLM Ground Zero",
-  "version": "0.2.0",
-  "description": "Local AI usage advisor for CLI coding agents — outcomes, friction, spend, and shared memory",
+  "version": "0.3.0",
+  "description": "Local AI usage advisor for CLI coding agents — outcomes, spend, token reduction, and shared memory",
   "main": "main.js",
   "license": "MIT",
   "author": "Douglas Vas",
@@ -33,6 +33,7 @@
       "lib.js",
       "log.js",
       "advisor/**",
+      "integrations/**",
       "static/**"
     ],
     "asarUnpack": [

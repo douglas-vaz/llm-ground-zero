@@ -39,6 +39,7 @@
       <button type="button" data-view="waste" aria-pressed="false">Waste audit</button>
       <button type="button" data-view="outcomes" aria-pressed="false">Outcome ledger</button>
       <button type="button" data-view="knowledge" aria-pressed="false">Knowledge</button>
+      <button type="button" data-view="savings" aria-pressed="false">Token savings</button>
       <button type="button" data-view="usage" aria-pressed="false">Usage</button>
     </nav>
 
@@ -92,6 +93,36 @@
       <section class="cards advisor-cards" id="knowledgeCards" aria-label="Knowledge summary"></section>
       <section class="panel action-panel"><div id="knowledgeSignals" class="action-list"></div></section>
       <p id="knowledgeState" class="panel-state" aria-live="polite"></p>
+    </section>
+
+    <section class="view" id="view-savings" data-view-panel="savings" aria-labelledby="savings-heading" hidden>
+      <div class="section-heading">
+        <div><h2 id="savings-heading">Headroom token savings</h2><p>Measured input compression, separated from cache and output estimates.</p></div>
+        <button type="button" class="text-button" data-action="settings">Configure agents</button>
+      </div>
+      <section class="cards advisor-cards" id="savingsCards" aria-label="Headroom savings summary">
+        <div class="card placeholder" aria-hidden="true"></div><div class="card placeholder" aria-hidden="true"></div><div class="card placeholder" aria-hidden="true"></div>
+      </section>
+      <div class="grid">
+        <section class="panel span-8" aria-labelledby="savings-trend-heading">
+          <h2 id="savings-trend-heading">Daily measured input reduction</h2>
+          <canvas id="savingsChart">Daily Headroom token savings chart</canvas>
+          <p id="savingsChartState" class="panel-state" aria-live="polite"></p>
+        </section>
+        <section class="panel span-4" aria-labelledby="headroom-health-heading">
+          <h2 id="headroom-health-heading">Integration health</h2>
+          <div id="headroomHealth" class="health-list"></div>
+        </section>
+        <section class="panel span-8" aria-labelledby="agent-savings-heading">
+          <h2 id="agent-savings-heading">Reduction by agent</h2>
+          <div class="savings-table" id="agentSavings"></div>
+        </section>
+        <section class="panel span-4" aria-labelledby="transform-heading">
+          <h2 id="transform-heading">Compression path</h2>
+          <div id="headroomTransforms" class="transform-list"></div>
+        </section>
+      </div>
+      <p id="savingsState" class="panel-state" aria-live="polite"></p>
     </section>
 
     <section class="view" id="view-usage" data-view-panel="usage" aria-labelledby="usage-heading" hidden>
@@ -166,11 +197,21 @@
 
   <dialog id="settingsDialog" aria-labelledby="settingsTitle">
     <form id="settingsForm">
-      <div class="dialog-head"><h2 id="settingsTitle">Subscription plans</h2><button type="button" class="icon-button" data-close="settingsDialog" aria-label="Close settings">×</button></div>
+      <div class="dialog-head"><h2 id="settingsTitle">Settings</h2><button type="button" class="icon-button" data-close="settingsDialog" aria-label="Close settings">×</button></div>
+      <fieldset class="headroom-settings">
+        <legend>Headroom context compression</legend>
+        <p>Optional local proxy. Applying changes updates only the selected agent configurations.</p>
+        <label class="toggle-row"><input type="checkbox" id="headroomClaude"> Claude Code</label>
+        <label class="toggle-row"><input type="checkbox" id="headroomCodex"> Codex</label>
+        <label class="toggle-row disabled"><input type="checkbox" disabled> Gemini CLI <span>upstream installer support pending</span></label>
+        <label class="mode-row">Mode<select id="headroomMode"><option value="cache">Cache-aware (recommended)</option><option value="token">Maximum token reduction</option></select></label>
+        <p id="headroomSettingsState" class="panel-state" role="status" aria-live="polite"></p>
+      </fieldset>
+      <h3>Subscription plans</h3>
       <p>Used only for local plan-fit comparisons. Prices stay on this Mac.</p>
       <div id="subscriptionRows" class="subscription-rows"></div>
       <button type="button" id="addSubscription">Add plan</button>
-      <div class="dialog-actions"><button type="submit" class="primary">Save plans</button><button type="button" data-close="settingsDialog">Cancel</button></div>
+      <div class="dialog-actions"><button type="submit" class="primary">Apply settings</button><button type="button" data-close="settingsDialog">Cancel</button></div>
       <p id="settingsState" class="panel-state" role="status" aria-live="polite"></p>
     </form>
   </dialog>

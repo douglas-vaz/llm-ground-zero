@@ -10,6 +10,32 @@ POINTER_LINE="Read and follow the shared instructions in $AGENTS_MD"
 
 CONFIGURED=()
 SKIPPED=()
+HEADROOM_TARGETS=""
+HEADROOM_MODE="cache"
+HEADROOM_VERSION="0.31.0"
+HEADROOM_PORT="8791"
+HEADROOM_WORKSPACE="$HOME/Library/Application Support/LLM Ground Zero/headroom"
+
+usage() {
+  echo "Usage: ./setup.sh [--headroom claude,codex] [--headroom-mode cache|token]"
+}
+
+parse_args() {
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --headroom) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; HEADROOM_TARGETS="$2"; shift 2 ;;
+      --headroom-mode) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; HEADROOM_MODE="$2"; shift 2 ;;
+      -h|--help) usage; exit 0 ;;
+      *) echo "ERROR: unknown option: $1" >&2; usage >&2; exit 2 ;;
+    esac
+  done
+  case "$HEADROOM_MODE" in cache|token) ;; *) echo "ERROR: headroom mode must be cache or token" >&2; exit 2 ;; esac
+  local target
+  IFS=',' read -r -a requested <<< "$HEADROOM_TARGETS"
+  for target in "${requested[@]:-}"; do
+    case "$target" in ""|claude|codex) ;; gemini) echo "ERROR: Gemini CLI is not yet supported by Headroom's installer." >&2; exit 2 ;; *) echo "ERROR: unsupported Headroom target: $target" >&2; exit 2 ;; esac
+  done
+}
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
@@ -65,6 +91,27 @@ install_usage_tools() {
   else
     SKIPPED+=("ccusage/tokscale — npm not found")
   fi
+}
+
+configure_headroom() {
+  [ -n "$HEADROOM_TARGETS" ] || return 0
+  local installed_version=""
+  if have headroom; then installed_version="$(headroom --version 2>/dev/null || true)"; fi
+  if [[ "$installed_version" != *"$HEADROOM_VERSION"* ]]; then
+    if ! have uv; then
+      if have brew; then brew install uv
+      else echo "ERROR: Headroom setup requires uv (https://docs.astral.sh/uv/)." >&2; exit 1
+      fi
+    fi
+    uv tool install --force --python 3.13 "headroom-ai[proxy]==$HEADROOM_VERSION"
+  fi
+  local args=(install apply --profile llm-ground-zero --preset persistent-service --scope provider --providers manual)
+  local target
+  IFS=',' read -r -a requested <<< "$HEADROOM_TARGETS"
+  for target in "${requested[@]}"; do args+=(--target "$target"); done
+  args+=(--port "$HEADROOM_PORT" --mode "$HEADROOM_MODE" --no-telemetry)
+  HEADROOM_WORKSPACE_DIR="$HEADROOM_WORKSPACE" HEADROOM_TELEMETRY=off headroom "${args[@]}"
+  CONFIGURED+=("Headroom ($HEADROOM_TARGETS, $HEADROOM_MODE mode)")
 }
 
 configure_claude() {
@@ -139,12 +186,14 @@ JS
 }
 
 main() {
+  parse_args "$@"
   mkdir -p "$DATA_DIR"
   install_engram
   install_usage_tools
   configure_claude
   configure_codex
   configure_gemini
+  configure_headroom
 
   echo
   echo "=== llm-ground-zero setup report ==="

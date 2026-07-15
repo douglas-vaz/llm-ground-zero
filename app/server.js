@@ -13,6 +13,7 @@ const advisor = require("./advisor");
 const advisorParsers = require("./advisor/parsers");
 const advisorUsage = require("./advisor/usage");
 const advisorStore = require("./advisor/store");
+const headroom = require("./integrations/headroom");
 
 const HOME = os.homedir();
 const CLAUDE_PROJECTS = path.join(HOME, ".claude", "projects");
@@ -152,6 +153,40 @@ function clearAdvisorCache() {
   for (const key of cache.keys()) if (key.startsWith("advisor-")) cache.delete(key);
 }
 
+function headroomDays(value) {
+  const parsed = Number(String(value || "30d").replace(/d$/, ""));
+  return ADVISOR_RANGES.has(parsed) ? parsed : null;
+}
+
+async function handleHeadroom(req, res, requestUrl) {
+  if (requestUrl.pathname === "/api/headroom/status" && req.method === "GET") {
+    json(res, 200, await cached("headroom-status", () => headroom.status()));
+    return true;
+  }
+  if (requestUrl.pathname === "/api/headroom" && req.method === "GET") {
+    const days = headroomDays(requestUrl.searchParams.get("range"));
+    if (!days) { json(res, 400, { error: "range must be 7d, 30d, or 90d" }); return true; }
+    const key = `headroom-${days}`;
+    if (requestUrl.searchParams.get("fresh") === "1") cache.delete(key);
+    json(res, 200, await cached(key, () => headroom.readSavings(days)));
+    return true;
+  }
+  if (requestUrl.pathname === "/api/headroom/settings" && req.method === "PUT") {
+    if (!validMutation(req)) { json(res, 403, { error: "same-origin action header required" }); return true; }
+    try {
+      const result = await headroom.reconcile(await readJsonBody(req));
+      for (const key of cache.keys()) if (key.startsWith("headroom")) cache.delete(key);
+      json(res, 200, result);
+    } catch (error) { json(res, error.status || 400, { error: String(error.message || error).slice(0, 300) }); }
+    return true;
+  }
+  if (requestUrl.pathname.startsWith("/api/headroom")) {
+    json(res, 405, { error: "method not allowed" });
+    return true;
+  }
+  return false;
+}
+
 async function handleAdvisor(req, res, requestUrl) {
   const days = rangeDays(requestUrl.searchParams.get("range"));
   if (!days) { json(res, 400, { error: "range must be 7d, 30d, or 90d" }); return true; }
@@ -244,6 +279,14 @@ function writeHead(res, status, headers = {}) {
 function startServer(port = 7788) {
   const server = http.createServer(async (req, res) => {
     const requestUrl = new URL(req.url || "/", "http://127.0.0.1");
+    if (requestUrl.pathname.startsWith("/api/headroom")) {
+      try { if (await handleHeadroom(req, res, requestUrl)) return; }
+      catch (e) {
+        logError("headroom", e, { version: VERSION });
+        json(res, 500, { error: "Headroom integration failed; check the local error log" });
+        return;
+      }
+    }
     if (requestUrl.pathname.startsWith("/api/advisor")) {
       try { if (await handleAdvisor(req, res, requestUrl)) return; }
       catch (e) {
