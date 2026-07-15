@@ -2,7 +2,7 @@
 
 ## Current state
 
-- Working branch: `main`; `codex/headroom-integration` was fast-forward merged.
+- Working branch: `codex/headroom-ui-install`, based on released `main`.
 - The approved AI Usage Advisor spec, implementation checklist, analysis
   engine, secured local API, and responsive five-view dashboard are implemented.
 - Version is bumped to v0.3.0 and the Electron package allowlist includes the
@@ -23,6 +23,8 @@
 - The optional Headroom integration, design record, checklist, sanitized
   screenshot, setup path, local API, Settings controls, and Token savings view
   are implemented. Headroom remains disabled by default.
+- In-app Headroom install/upgrade and 15-second status monitoring are now
+  implemented on the working branch but not yet released.
 
 ## Implemented behavior
 
@@ -39,6 +41,9 @@
   enabling Claude Code and Codex, with Gemini visibly unsupported upstream.
 - Reports measured before/after/saved tokens, weighted reduction, by-agent and
   daily breakdowns, transform counts, proxy health, and optimization overhead.
+- Settings can install or upgrade the pinned CLI through an allowlisted `uv`
+  command without changing agent routing; the user explicitly selects targets
+  in a separate Apply step.
 - Delegates reversible provider mutations to Headroom's official installer;
   memory, learn, output shaping, and telemetry remain off.
 
@@ -58,8 +63,12 @@
   30-day savings view renders at desktop size with no console-reported failure.
 - The installed bundle reports v0.3.0, contains x86_64 and arm64, includes the
   Headroom adapter in ASAR, and returns healthy `/api/health` output.
-- The machine's pre-existing Headroom v0.28.0 is correctly reported as
-  incompatible with no selected targets; no agent provider config was changed.
+- The machine now exposes Headroom v0.31.0 with no selected targets; browser
+  verification reports Ready and no agent provider config was changed.
+- Updated Node suite: 27 passing, including the pinned in-app installer command,
+  rejection of client-supplied arguments, and status-monitor frontend contract.
+- Browser verification shows a compatible Ready state in Settings and the live
+  Token savings status badge; no agent target was enabled during verification.
 
 ## Recent decisions
 
@@ -92,8 +101,7 @@
 
 ## Next steps
 
-1. Optionally run `./setup.sh --headroom claude,codex --headroom-mode cache`
-   when the user chooses to upgrade Headroom and enable selected agent routes.
+1. Review, commit, and release the in-app installer/status-monitor increment.
 2. Monitor user feedback and sanitized runtime logs for advisor/Headroom edge cases.
 3. Improve the offline state so a stopped server is distinguished from seven
    independent data-source failures.

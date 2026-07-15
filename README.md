@@ -70,19 +70,26 @@ into each agent's global instructions. Restart your agents afterwards.
 
 [Headroom](https://github.com/headroomlabs-ai/headroom) runs a local proxy that
 compresses eligible context before it reaches the model. It is never installed
-or enabled by default. To install the tested version and enable it for both
-supported agents:
+or enabled by default. Open the app's **Settings** dialog and select **Install
+Headroom** (or **Upgrade** when an older version is detected). Installation
+uses `uv`, pins the tested Headroom version, and does not change agent routing.
+Then select Claude Code and/or Codex, choose `cache` or `token` mode, and apply.
+
+The app checks Headroom health every 15 seconds and shows the live version,
+proxy state, and enabled agents in Settings and the Token savings view. If `uv`
+is not installed, run `brew install uv` and reopen Settings.
+
+The equivalent non-interactive setup remains available:
 
 ```bash
 ./setup.sh --headroom claude,codex --headroom-mode cache
 ```
 
-Use `claude` or `codex` alone to enable only that agent. After Headroom is
-installed, the app's **Settings** dialog can change the selected agents or
-switch between `cache` mode (the default, tuned for stable provider prompt
-caches) and `token` mode (maximum prompt reduction). Applying with neither
-agent selected removes LLM Ground Zero's Headroom profile and restores the
-provider configuration managed by Headroom.
+Use `claude` or `codex` alone to enable only that agent. `cache` mode is the
+default and is tuned for stable provider prompt caches; `token` mode favors
+maximum prompt reduction. Applying with neither agent selected removes LLM
+Ground Zero's Headroom profile and restores the provider configuration managed
+by Headroom.
 
 Gemini remains available for shared memory and usage reporting, but Headroom
 v0.31.0 does not expose Gemini CLI as a persistent-install target, so its
@@ -212,9 +219,9 @@ usernames, or file paths — so it is safe to attach to a GitHub issue.
 For Headroom, open **Settings** and check the version, profile health, selected
 agents, and mode. The integration pins `headroom-ai[proxy]==0.31.0`, keeps its
 state under `~/Library/Application Support/LLM Ground Zero/headroom`, and owns
-only the `llm-ground-zero` deployment profile on port 8791. Re-running the
-optional setup command reconciles that profile without touching unrelated
-Headroom installations.
+only the `llm-ground-zero` deployment profile on port 8791. Use the in-app
+Install/Upgrade action or re-run the optional setup command to reconcile the
+tested CLI without touching unrelated Headroom deployments.
 
 ## Per-agent reference
 

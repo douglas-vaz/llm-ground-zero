@@ -98,7 +98,7 @@
     <section class="view" id="view-savings" data-view-panel="savings" aria-labelledby="savings-heading" hidden>
       <div class="section-heading">
         <div><h2 id="savings-heading">Headroom token savings</h2><p>Measured input compression, separated from cache and output estimates.</p></div>
-        <button type="button" class="text-button" data-action="settings">Configure agents</button>
+        <div class="headroom-actions"><span id="headroomMonitorStatus" class="status-pill" role="status" aria-live="polite">Checking Headroom…</span><button type="button" class="text-button" data-action="settings">Configure agents</button></div>
       </div>
       <section class="cards advisor-cards" id="savingsCards" aria-label="Headroom savings summary">
         <div class="card placeholder" aria-hidden="true"></div><div class="card placeholder" aria-hidden="true"></div><div class="card placeholder" aria-hidden="true"></div>
@@ -200,11 +200,12 @@
       <div class="dialog-head"><h2 id="settingsTitle">Settings</h2><button type="button" class="icon-button" data-close="settingsDialog" aria-label="Close settings">×</button></div>
       <fieldset class="headroom-settings">
         <legend>Headroom context compression</legend>
-        <p>Optional local proxy. Applying changes updates only the selected agent configurations.</p>
-        <label class="toggle-row"><input type="checkbox" id="headroomClaude"> Claude Code</label>
-        <label class="toggle-row"><input type="checkbox" id="headroomCodex"> Codex</label>
+        <p>Optional local proxy. Install or upgrade here, then choose which agent configurations Headroom manages.</p>
+        <div class="headroom-install-row"><strong id="headroomLiveStatus">Checking Headroom…</strong><button type="button" id="headroomInstall">Install Headroom</button></div>
+        <label class="toggle-row"><input type="checkbox" id="headroomClaude" disabled> Claude Code</label>
+        <label class="toggle-row"><input type="checkbox" id="headroomCodex" disabled> Codex</label>
         <label class="toggle-row disabled"><input type="checkbox" disabled> Gemini CLI <span>upstream installer support pending</span></label>
-        <label class="mode-row">Mode<select id="headroomMode"><option value="cache">Cache-aware (recommended)</option><option value="token">Maximum token reduction</option></select></label>
+        <label class="mode-row">Mode<select id="headroomMode" disabled><option value="cache">Cache-aware (recommended)</option><option value="token">Maximum token reduction</option></select></label>
         <p id="headroomSettingsState" class="panel-state" role="status" aria-live="polite"></p>
       </fieldset>
       <h3>Subscription plans</h3>

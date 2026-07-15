@@ -160,6 +160,7 @@ function headroomDays(value) {
 
 async function handleHeadroom(req, res, requestUrl) {
   if (requestUrl.pathname === "/api/headroom/status" && req.method === "GET") {
+    if (requestUrl.searchParams.get("fresh") === "1") cache.delete("headroom-status");
     json(res, 200, await cached("headroom-status", () => headroom.status()));
     return true;
   }
@@ -169,6 +170,17 @@ async function handleHeadroom(req, res, requestUrl) {
     const key = `headroom-${days}`;
     if (requestUrl.searchParams.get("fresh") === "1") cache.delete(key);
     json(res, 200, await cached(key, () => headroom.readSavings(days)));
+    return true;
+  }
+  if (requestUrl.pathname === "/api/headroom/install" && req.method === "POST") {
+    if (!validMutation(req)) { json(res, 403, { error: "same-origin action header required" }); return true; }
+    try {
+      const body = await readJsonBody(req);
+      if (Object.keys(body).length) throw new Error("install request must be empty");
+      const result = await headroom.installCli();
+      for (const key of cache.keys()) if (key.startsWith("headroom")) cache.delete(key);
+      json(res, 200, result);
+    } catch (error) { json(res, error.status || 400, { error: String(error.message || error).slice(0, 300) }); }
     return true;
   }
   if (requestUrl.pathname === "/api/headroom/settings" && req.method === "PUT") {

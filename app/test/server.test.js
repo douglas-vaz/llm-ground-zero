@@ -125,6 +125,13 @@ test("Headroom endpoints expose measured savings and protect mutations", async (
     assert.strictEqual((await fetch(`${base}/api/headroom/settings`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: "{}",
     })).status, 403);
+    assert.strictEqual((await fetch(`${base}/api/headroom/install`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+    })).status, 403);
+    const mutationHeaders = { Origin: base, "Content-Type": "application/json", "X-LLM-Ground-Zero-Action": "1" };
+    assert.strictEqual((await fetch(`${base}/api/headroom/install`, {
+      method: "POST", headers: mutationHeaders, body: JSON.stringify({ binary: "/tmp/headroom" }),
+    })).status, 400);
   } finally {
     _cache.clear();
     server.close();

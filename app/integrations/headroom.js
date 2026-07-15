@@ -32,6 +32,16 @@ function candidates() {
   ].filter(Boolean);
 }
 
+function uvCandidates() {
+  return [
+    process.env.LLM_GROUND_ZERO_UV_BIN,
+    path.join(os.homedir(), ".local", "bin", "uv"),
+    "/opt/homebrew/bin/uv",
+    "/usr/local/bin/uv",
+    "uv",
+  ].filter(Boolean);
+}
+
 function run(binary, args, options = {}) {
   return new Promise((resolve, reject) => {
     execFile(binary, args, {
@@ -72,6 +82,16 @@ async function locate() {
   return { binary: null, version: null, compatible: false };
 }
 
+async function locateUv() {
+  for (const binary of uvCandidates()) {
+    try {
+      const output = await run(binary, ["--version"], { timeout: 5000 });
+      if (/\buv\s+\d+\.\d+/i.test(output)) return { binary, version: output.match(/\d+\.\d+\.\d+/)?.[0] || null };
+    } catch { /* try next location */ }
+  }
+  return { binary: null, version: null };
+}
+
 function readManifest() {
   const file = path.join(workspaceDir(), "deploy", PROFILE, "manifest.json");
   try {
@@ -96,9 +116,10 @@ async function proxyJson(route, timeout = 2500) {
 
 async function status() {
   const data = fixture();
-  if (data?.status) return data.status;
+  if (data?.status) return { installerAvailable: true, minimumVersion: MIN_VERSION, ...data.status };
   const found = await locate();
-  if (!found.binary) return { installed: false, compatible: false, version: null, healthy: false, targets: [], mode: "cache", warnings: [] };
+  const uv = await locateUv();
+  if (!found.binary) return { installed: false, compatible: false, version: null, healthy: false, targets: [], mode: "cache", warnings: [], installerAvailable: Boolean(uv.binary), minimumVersion: MIN_VERSION };
   const manifest = readManifest();
   let healthy = false;
   try { healthy = (await proxyJson("/health")).status === "healthy"; } catch { /* stopped */ }
@@ -108,7 +129,21 @@ async function status() {
   return {
     installed: true, compatible: found.compatible, version: found.version, healthy,
     targets: manifest?.targets || [], mode: manifest?.mode || "cache", warnings,
+    installerAvailable: Boolean(uv.binary), minimumVersion: MIN_VERSION,
   };
+}
+
+async function installCliNow() {
+  if (fixture()) throw new Error("Headroom installation is unavailable while fixture data is active.");
+  const uv = await locateUv();
+  if (!uv.binary) throw new Error("uv is required to install Headroom. Install uv with Homebrew, then try again.");
+  await run(uv.binary, ["tool", "install", "--force", "--python", "3.13", `headroom-ai[proxy]==${MIN_VERSION}`], {
+    timeout: 10 * 60_000,
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  const found = await locate();
+  if (!found.binary || !found.compatible) throw new Error(`Headroom ${MIN_VERSION} was installed but could not be verified. Restart the app and try again.`);
+  return status();
 }
 
 function clientName(value) {
@@ -215,11 +250,17 @@ async function reconcileNow(input) {
   return status();
 }
 
-let reconcileQueue = Promise.resolve();
-function reconcile(input) {
-  const result = reconcileQueue.then(() => reconcileNow(input));
-  reconcileQueue = result.catch(() => {});
+let operationQueue = Promise.resolve();
+function queueOperation(action) {
+  const result = operationQueue.then(action);
+  operationQueue = result.catch(() => {});
   return result;
 }
 
-module.exports = { MIN_VERSION, PORT, PROFILE, workspaceDir, versionAtLeast, locate, status, readSavings, summarizeRecords, validateSettings, reconcile };
+function reconcile(input) {
+  return queueOperation(() => reconcileNow(input));
+}
+
+function installCli() { return queueOperation(installCliNow); }
+
+module.exports = { MIN_VERSION, PORT, PROFILE, workspaceDir, versionAtLeast, locate, locateUv, status, installCli, readSavings, summarizeRecords, validateSettings, reconcile };
